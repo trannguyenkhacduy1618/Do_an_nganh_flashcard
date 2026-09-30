@@ -1,0 +1,81 @@
+{
+  "id": 2,
+  "name": "sczxcas",
+  "cards": [
+    {
+      "id": 1,
+      "question": "Obstruct",
+      "answer": "Cản trở, Gây trở ngại \n Làm tắc, Làm Nghẽn \n Ngăn, Che khuất"
+    },
+    {
+      "id": 2,
+      "question": "Abandon",
+      "answer": "Từ bỏ \n Bỏ rơi \n Rời bỏ"
+    },
+    {
+      "id": 3,
+      "question": "Accumulate",
+      "answer": "Tích lũy \n Gom góp \n Tích tụ"
+    },
+    {
+      "id": 4,
+      "question": "Adequate",
+      "answer": "Đầy đủ \n Thỏa đáng \n Đủ dùng"
+    },
+    {
+      "id": 5,
+      "question": "Compel",
+      "answer": "Ép buộc \n Bắt buộc \n Cưỡng ép"
+    },
+    {
+      "id": 6,
+      "question": "Conceal",
+      "answer": "Che giấu \n Giấu kín \n Che đậy"
+    },
+    {
+      "id": 7,
+      "question": "Deteriorate",
+      "answer": "Xấu đi \n Suy giảm \n Trở nên tồi tệ hơn"
+    },
+    {
+      "id": 8,
+      "question": "Eliminate",
+      "answer": "Loại bỏ \n Xóa bỏ \n Khử"
+    },
+    {
+      "id": 9,
+      "question": "Enhance",
+      "answer": "Nâng cao \n Tăng cường \n Cải thiện"
+    },
+    {
+      "id": 10,
+      "question": "Inevitable",
+      "answer": "Không thể tránh khỏi \n Chắc chắn xảy ra"
+    },
+    {
+      "id": 11,
+      "question": "Neglect",
+      "answer": "Sao nhãng \n Bỏ bê \n Không quan tâm"
+    },
+    {
+      "id": 12,
+      "question": "Prohibit",
+      "answer": "Cấm \n Ngăn cấm \n Không cho phép"
+    },
+    {
+      "id": 13,
+      "question": "Reluctant",
+      "answer": "Miễn cưỡng \n Không muốn \n Do dự"
+    },
+    {
+      "id": 14,
+      "question": "Resemble",
+      "answer": "Giống \n Tương tự \n Giống với"
+    },
+    {
+      "id": 15,
+      "question": "Sufficient",
+      "answer": "Đủ \n Đầy đủ \n Thỏa đáng"
+    }
+  ]
+}
