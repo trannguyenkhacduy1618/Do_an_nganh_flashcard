@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+#FlashCard Stuff
+__pycache__/
+*.pyc
+anki_app.db
