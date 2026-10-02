@@ -220,4 +220,4 @@ __marimo__/
 #FlashCard Stuff
 __pycache__/
 *.pyc
-flashcard_app/data/storage/*
+Flash_Card_App/data/storage/*
