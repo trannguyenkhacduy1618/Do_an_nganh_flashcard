@@ -81,3 +81,45 @@ class JsonRepository:
         ]
 
         return max(ids, default=0) + 1
+    def delete_deck(self, deck_name):
+
+        path = self._get_path(deck_name)
+
+        if path.exists():
+            path.unlink()
+    def rename_deck(self, old_name, new_name):
+
+        # Same name, do nothing
+        if old_name == new_name:
+            return True
+
+
+        old_path = self._get_path(old_name)
+        new_path = self._get_path(new_name)
+
+
+        if not old_path.exists():
+            return False
+
+
+        data = self._read_file(
+            old_path
+        )
+
+        data["name"] = new_name
+
+
+        self._write_file(
+            new_path,
+            data
+        )
+
+
+        old_path.unlink()
+
+        return True
+    def deck_exists(self, name):
+
+        path = self._get_path(name)
+
+        return path.exists()

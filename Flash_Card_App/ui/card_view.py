@@ -203,6 +203,17 @@ class CardView(tk.Frame):
             "deck"
         )
 
+        style = ttk.Style()
+        style.configure(
+            "Treeview",
+            font=("Segoe UI", 11),      # row font size
+            rowheight=35                # increase row height
+        )
+
+        style.configure(
+            "Treeview.Heading",
+            font=("Segoe UI", 10, "bold")  # column title font
+        )
         self.card_tree = ttk.Treeview(
             self.middle_panel,
             columns=columns,

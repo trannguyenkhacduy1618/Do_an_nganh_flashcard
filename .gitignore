@@ -220,4 +220,4 @@ __marimo__/
 #FlashCard Stuff
 __pycache__/
 *.pyc
-anki_app.db
+flashcard_app/data/storage/*

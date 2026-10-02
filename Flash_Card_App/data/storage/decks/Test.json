@@ -1,6 +1,6 @@
 {
   "id": 2,
-  "name": "sczxcas",
+  "name": "Test",
   "cards": [
     {
       "id": 1,
@@ -71,11 +71,6 @@
       "id": 14,
       "question": "Resemble",
       "answer": "Giống \n Tương tự \n Giống với"
-    },
-    {
-      "id": 15,
-      "question": "Sufficient",
-      "answer": "Đủ \n Đầy đủ \n Thỏa đáng"
     }
   ]
 }
