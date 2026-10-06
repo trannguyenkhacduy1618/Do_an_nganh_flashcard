@@ -1,0 +1,58 @@
+{
+    "id": 5,
+    "name": "Văn phòng",
+    "cards": [
+        {
+            "id": 1,
+            "question": "Wikipedia",
+            "answer": "- wikipedia"
+        },
+        {
+            "id": 2,
+            "question": "created",
+            "answer": "- gây nên (động từ)\n- đóng tuồng (động từ)\n- làm rối loạn (động từ)\n- phong chức (động từ)\n- sáng tạo (động từ)\n- tạo thành (động từ)",
+            "definitions": [
+                {
+                    "definitions": [
+                        "bring (something) into existence."
+                    ],
+                    "pos": "động từ"
+                }
+            ],
+            "synonyms": [
+                "create",
+                "constitute",
+                "impersonate",
+                "represent",
+                "disorganize",
+                "dislocate",
+                "ravel",
+                "tumble",
+                "ordain",
+                "crown",
+                "form"
+            ],
+            "examples": [
+                "he created a thirty-acre lake"
+            ]
+        },
+        {
+            "id": 3,
+            "question": "aiming",
+            "answer": "- nhắm (tính từ)",
+            "definitions": [
+                {
+                    "pos": "động từ",
+                    "definitions": [
+                        "point or direct (a weapon or camera) at a target.",
+                        "have the intention of achieving."
+                    ]
+                }
+            ],
+            "examples": [
+                "aim the camcorder at some suitable object",
+                "new French cooking aims at producing clear, fresh flavors and light textures"
+            ]
+        }
+    ]
+}
