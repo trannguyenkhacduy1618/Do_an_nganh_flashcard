@@ -1,8 +1,0 @@
-BG = "#f7f7f7"
-WHITE = "#ffffff"
-TEXT = "#222222"
-SECONDARY = "#888888"
-BLUE = "#1355d8"
-BORDER = "#dddddd"
-SELECTED = "#e3e3e3"
-BUTTON = "#f5f5f5"
