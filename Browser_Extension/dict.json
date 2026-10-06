@@ -3,8 +3,87 @@
     "ipa": "/həˈlō/",
     "meaning": "- xin chào"
   },
-  "Recovery": {
+  "recovery": {
     "ipa": "/rəˈkəv(ə)rē/",
     "meaning": "- sự hồi phục"
+  },
+  "primary": {
+    "ipa": "/ˈprīˌmerē/",
+    "meaning": "- căn nguyên (tính từ)\n- căn bản (tính từ)\n- thuộc về nguyên thủy (tính từ)\n- trước hết (tính từ)\n- đầu (tính từ)\n- đầu tiên (tính từ)\n- nguyên nhân đầu tiên (danh từ)\n- phần cơ bản (danh từ)",
+    "definitions": [
+      {
+        "pos": "tính từ",
+        "definitions": [
+          "of chief importance; principal.",
+          "earliest in time or order.",
+          "not derived from, caused by, or based on anything else; original.",
+          "(of an organic compound) having its functional group located on a carbon atom which is bonded to no more than one other carbon atom.",
+          "denoting or relating to organisms that produce organic compounds from simple substances such as water and carbon dioxide, typically by photosynthesis.",
+          "relating to or denoting the input side of a device using electromagnetic induction, especially in a transformer.",
+          "former term for Paleozoic."
+        ]
+      },
+      {
+        "pos": "danh từ",
+        "definitions": [
+          "(in the US) a preliminary election to appoint delegates to a party conference or to select the candidates for a principal, especially presidential, election.",
+          "a primary color.",
+          "the Primary or Paleozoic era."
+        ]
+      },
+      {
+        "pos": "động từ",
+        "definitions": [
+          "(in the US) run against (the current holder of a political office) in the preliminary election a party uses to select its candidate for the general election."
+        ]
+      }
+    ],
+    "synonyms": [
+      "radical",
+      "fundamental",
+      "ultimate",
+      "first",
+      "above",
+      "premier",
+      "capital",
+      "early",
+      "original",
+      "prime",
+      "prior"
+    ],
+    "examples": [
+      "the primary stage of their political education",
+      "a primary bone tumor",
+      "his expert handling of the primary and secondary literature is clear on every page",
+      "seed-eating birds and herbivorous insects are primary consumers",
+      "a primary alcohol"
+    ]
+  },
+  "wikipedia": {
+    "ipa": "",
+    "meaning": "- wikipedia",
+    "definitions": [],
+    "synonyms": [],
+    "examples": []
+  },
+  "alongside": {
+    "ipa": "/əˌlôNGˈsīd/",
+    "meaning": "- chạy dài theo (trạng từ)\n- ghé dọc theo (trạng từ)\n- tàu đậu (trạng từ)",
+    "definitions": [
+      {
+        "pos": "giới từ",
+        "definitions": [
+          "close to the side of; next to."
+        ]
+      }
+    ],
+    "synonyms": [],
+    "examples": [
+      "alongside the development of full-time courses there had to be provision for the part-time student",
+      "she was sitting alongside him",
+      "the road passes alongside the viaduct",
+      "the boat came alongside",
+      "I worked alongside him for many weeks"
+    ]
   }
 }

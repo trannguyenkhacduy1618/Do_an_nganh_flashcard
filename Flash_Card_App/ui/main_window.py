@@ -162,6 +162,35 @@ class MainWindow:
     def blank_action(self):
         pass
 
+    # =====================================================
+    # Đồng bộ với Browser Extension
+    # =====================================================
+
+    def refresh_current_view(self):
+        """Làm mới màn hình đang xem khi extension vừa lưu từ mới.
+
+        Chỉ làm mới các màn hình dạng danh sách (Decks / Browse). Các màn hình
+        đang nhập liệu (Add) hoặc đang học (Study) được giữ nguyên để không
+        làm gián đoạn người dùng.
+        """
+
+        if isinstance(self.current_view, DeckView):
+            self.show_decks()
+        elif isinstance(self.current_view, CardView):
+            self.show_browse()
+
+    def focus_window(self):
+        """Đưa cửa sổ app lên trước (dùng khi extension bấm 'Mở App')."""
+
+        self.root.deiconify()
+        self.root.lift()
+        self.root.attributes("-topmost", True)
+        self.root.after(
+            400,
+            lambda: self.root.attributes("-topmost", False)
+        )
+        self.root.focus_force()
+
     #newly added
     def show_browse(self):
         self.clear_content()

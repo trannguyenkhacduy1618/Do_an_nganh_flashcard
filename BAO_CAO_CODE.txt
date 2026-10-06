@@ -1,0 +1,1382 @@
+================================================================================
+                    BÁO CÁO CHI TIẾT MÃ NGUỒN DỰ ÁN
+         "OFFLINE DICTIONARY + FLASH CARD APP" (ĐỒ ÁN NGÀNH)
+================================================================================
+
+Tài liệu này giải thích tường tận nội dung mã nguồn của dự án: kiến trúc, từng
+file, từng hàm, luồng dữ liệu, các quyết định kỹ thuật và những lỗi đã được sửa.
+Mục tiêu: người đọc nắm được toàn bộ hệ thống mà không cần mở code.
+
+Ngày lập: 06/10/2026
+Phiên bản tài liệu: 1.0
+
+
+================================================================================
+MỤC LỤC
+================================================================================
+
+  PHẦN 0   — TỔNG QUAN DỰ ÁN
+  PHẦN 1   — KIẾN TRÚC HỆ THỐNG
+  PHẦN 2   — BROWSER EXTENSION (Chrome/Edge MV3)
+             2.1  manifest.json
+             2.2  background.js (Service Worker)
+             2.3  content.js (Content Script + popup bôi đen)
+  PHẦN 3   — FLASH CARD APP (Python / Tkinter)
+             3.1  config.py
+             3.2  main.py (điểm khởi động)
+             3.3  server.py (cầu nối HTTP + từ điển dùng chung)
+             3.4  data/json_repository.py
+             3.5  data/database.py
+             3.6  logic/deck_manager.py
+             3.7  logic/card_manager.py
+             3.8  ui/theme.py
+             3.9  ui/main_window.py
+             3.10 ui/deck_view.py
+             3.11 ui/add_view.py
+             3.12 ui/card_view.py
+             3.13 ui/study_view.py
+             3.14 ui/manage_window.py
+  PHẦN 4   — CƠ CHẾ PROTOCOL flashcard://
+  PHẦN 5   — DỮ LIỆU & ĐỊNH DẠNG FILE
+  PHẦN 6   — CÁC LUỒNG NGHIỆP VỤ CHÍNH
+  PHẦN 7   — CÁC LỖI ĐÃ SỬA (BUG LOG)
+  PHẦN 8   — QUYẾT ĐỊNH THIẾT KẾ & ĐÁNH ĐỔI
+  PHẦN 9   — HƯỚNG DẪN CHẠY & KIỂM THỬ
+  PHẦN 10  — HẠN CHẾ & HƯỚNG PHÁT TRIỂN
+
+
+================================================================================
+PHẦN 0 — TỔNG QUAN DỰ ÁN
+================================================================================
+
+0.1. DỰ ÁN GỒM HAI NỬA ĐỘC LẬP NHƯNG LIÊN THÔNG
+
+  1. Browser_Extension/
+     Tiện ích mở rộng cho Chrome/Edge (Manifest V3). Cho phép người dùng BÔI ĐEN
+     một từ/cụm từ trên bất kỳ trang web nào -> hiện popup tra nghĩa tại chỗ,
+     kèm phiên âm (IPA), định nghĩa theo từ loại, từ đồng nghĩa, câu ví dụ.
+     Người dùng có thể LƯU từ đó vào app Flashcard.
+
+  2. Flash_Card_App/
+     Ứng dụng desktop viết bằng Python + Tkinter (giao diện kiểu Anki): quản lý
+     bộ thẻ (Decks), học thẻ (Study), duyệt thẻ (Browse), và lưu tiến độ học.
+
+0.2. ĐIỂM NỐI HAI NỬA ("cầu nối")
+
+  Hai nửa chạy ở hai tiến trình khác nhau (trình duyệt vs. Python). Chúng không
+  thể gọi hàm trực tiếp. Vì vậy dự án dùng HAI cơ chế:
+
+  (a) HTTP bridge — app Python tự mở một HTTP server nhỏ ở http://127.0.0.1:5000
+      (trong server.py). Extension gọi các endpoint của server này để:
+        - lấy danh sách deck
+        - tạo deck mới
+        - lưu 1 thẻ vào app
+        - đọc/ghi TỪ ĐIỂN DÙNG CHUNG (dict.json)
+        - nhờ app đưa cửa sổ lên trước
+
+  (b) Custom URL protocol "flashcard://" — cho phép extension MỞ app desktop.
+      Windows được đăng ký (một lần, qua install_protocol.py) để khi gặp link
+      "flashcard://open" thì chạy Flash_Card_App/run_app.bat -> python main.py.
+
+0.3. TỪ ĐIỂN DÙNG CHUNG (khái niệm xuyên suốt)
+
+  File Browser_Extension/dict.json KHÔNG còn là một từ điển tĩnh nặng ~28MB đi
+  kèm extension. Nó nay là "BỘ ĐỆM TRA CỨU TỰ LỚN DẦN" (growing lookup cache):
+
+    - Extension tra theo 3 tầng: dict.json -> cache -> Google Translate API
+    - Từ mới dịch qua Google được GHI LẠI vào cả cache lẫn dict.json
+    - App đọc chính file này để nạp từ vựng vào deck "Từ điển"
+
+  Nhờ vậy extension và app dùng CHUNG một từ điển thống nhất, và càng dùng càng
+  nhiều từ được tra offline (không cần mạng).
+
+0.4. CÔNG NGHỆ SỬ DỤNG
+
+  - Extension: JavaScript thuần, Chrome/Edge Extension Manifest V3
+               (service worker + content script + chrome.storage.local)
+  - App:       Python 3, Tkinter (GUI), sqlite3 (tiến độ học), json (lưu deck)
+  - Bridge:    Python http.server (ThreadingHTTPServer) — CHỈ dùng thư viện chuẩn,
+               KHÔNG cần pip install gì thêm
+  - API ngoài: Google Translate endpoint không chính thức
+               (translate.googleapis.com/translate_a/single)
+
+
+================================================================================
+PHẦN 1 — KIẾN TRÚC HỆ THỐNG
+================================================================================
+
+1.1. SƠ ĐỒ TỔNG THỂ
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │                     TRÌNH DUYỆT (Chrome / Edge)                       │
+  │                                                                        │
+  │   content.js (mỗi trang web)          background.js (service worker)  │
+  │   ├── bắt bôi đen                     ├── tra từ 3 tầng               │
+  │   ├── hiện popup tra từ               ├── gọi Google Translate        │
+  │   ├── chọn nhóm + lưu thẻ             ├── gọi API cổng 5000           │
+  │   └── nút "Mở Flashcard App"          └── quản lý chrome.storage.local│
+  │                                                                        │
+  └───────────────┬───────────────────────────────┬──────────────────────┘
+                  │ HTTP (127.0.0.1:5000)          │ flashcard:// protocol
+                  ▼                                ▼
+  ┌───────────────────────────────┐    ┌──────────────────────────────────┐
+  │   Flash_Card_App (Python)      │    │  run_app.bat -> python main.py   │
+  │                                │    │  (Windows tự chạy khi mở link)   │
+  │   server.py (HTTP bridge)      │◄───┘                                  │
+  │     ├── /ping /groups /focus   │
+  │     ├── /create_group          │
+  │     ├── /save_word             │
+  │     └── /dict  /add_dict       │
+  │                                │
+  │   main.py (Tkinter UI + bridge)│
+  │     ├── logic/ (Deck, Card)    │
+  │     └── data/  (JSON, SQLite)  │
+  └───────────────┬────────────────┘
+                  │ đọc/ghi chung
+                  ▼
+     ┌────────────────────────────────────────────┐
+     │  Browser_Extension/dict.json               │
+     │  (TỪ ĐIỂN DÙNG CHUNG — được cả 2 bên dùng) │
+     └────────────────────────────────────────────┘
+
+1.2. NGUYÊN TẮC PHÂN TẦNG
+
+  - data/    : Tầng truy cập dữ liệu thô (đọc/ghi file JSON, SQLite). Không
+               chứa logic nghiệp vụ.
+  - logic/   : Tầng nghiệp vụ (quản lý deck, quản lý thẻ, tính lịch ôn tập).
+  - ui/      : Tầng giao diện (Tkinter). Chỉ gọi xuống logic/, không đụng file.
+  - server.py: Tầng tích hợp — cầu nối HTTP. Dùng lại chính logic/ + data/,
+               không tự lưu dữ liệu riêng.
+
+  Nguyên tắc: server KHÔNG có vùng lưu trữ riêng. Nó tái sử dụng DeckManager và
+  CardManager, nên từ lưu từ extension nằm CHUNG trong data/storage/decks/*.json
+  và tiến độ trong data/storage/test.db. Không có "dữ liệu hai nơi".
+
+1.3. LUỒNG DỮ LIỆU CẤP CAO
+
+  Bôi đen từ trên web
+      -> content.js gửi LOOKUP cho background.js
+      -> background.js tra: dict.json -> cache -> Google
+      -> nếu là từ mới: ghi cache + đẩy lên /add_dict (dict.json)
+      -> popup hiện kết quả
+      -> người dùng bấm "Lưu vào Flashcard"
+      -> content.js gửi SAVE_WORD
+      -> background.js gọi /save_word
+      -> server.py gọi CardManager.add_card -> ghi deck JSON + SQLite
+      -> server báo "có thay đổi" -> main.py nạp lại dict vào app + refresh UI
+
+
+================================================================================
+PHẦN 2 — BROWSER EXTENSION (Chrome/Edge MV3)
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1. manifest.json
+--------------------------------------------------------------------------------
+
+Đây là "khai báo" của extension. Nội dung chính:
+
+  "manifest_version": 3          -> chuẩn MV3 (mới nhất)
+  "name": "Offline Dictionary"
+  "version": "1.1"
+  "permissions": ["storage"]     -> cần quyền dùng chrome.storage.local
+
+  "host_permissions":            -> các host mà extension được phép gọi
+      "http://127.0.0.1:5000/*"    (cầu nối tới app)
+      "http://localhost:5000/*"    (phòng khi app bind localhost)
+      "https://translate.googleapis.com/*"  (Google Translate)
+
+  "background": {"service_worker": "background.js"}
+      -> background.js chạy như service worker (có thể ngủ khi rảnh)
+
+  "content_scripts": [{ "matches": ["<all_urls>"], "js": ["content.js"] }]
+      -> content.js được chèn vào MỌI trang web
+
+  LƯU Ý LỊCH SỬ: Bản trước có "action.default_popup" trỏ tới popup.html trên
+  thanh công cụ. Popup đó đã được BỎ (xem Phần 7). Giao diện nay chỉ còn popup
+  bôi đen. File manifest.json ở THƯ MỤC GỐC là bản cũ, KHÔNG dùng — manifest
+  thật nằm ở Browser_Extension/manifest.json.
+
+--------------------------------------------------------------------------------
+2.2. background.js (Service Worker)
+--------------------------------------------------------------------------------
+
+background.js là "bộ não" của extension: nó tra từ, gọi Google, gọi app, và
+quản lý cache. Content script không tự làm việc này mà gửi message cho nó.
+
+BẢN ĐỒ CÁC HẰNG SỐ & BIẾN TOÀN CỤC
+-----------------------------------
+  API_BASE = "http://127.0.0.1:5000"   địa chỉ cầu nối (phải khớp server.py)
+  CACHE_KEY = "dictCache"              khoá lưu cache trong chrome.storage
+
+  dictionaryData   : bản dict.json giữ trong RAM (null khi chưa nạp)
+  dictLoadPromise  : Promise đảm bảo chỉ nạp dict 1 lần
+  lookupSeq        : số thứ tự mỗi lần tra, để bỏ kết quả cũ (chống race)
+
+2.2.1. TẦNG 1 — ĐỌC dict.json
+
+  _readPackagedDict()
+      Đọc file dict.json ĐÓNG GÓI trong extension bằng
+      fetch(chrome.runtime.getURL("dict.json")).
+      Đây là bản CHỤP LÚC CÀI — có thể đã cũ so với file trên đĩa.
+
+  _readDictFromApp()
+      Gọi GET http://127.0.0.1:5000/dict để lấy dict MỚI NHẤT từ app.
+      Trả về object dict, hoặc null nếu app không chạy / trả dữ liệu sai.
+      Đây mới là bản app ghi thêm từ vào.
+
+  loadDictionary()
+      Chỉ nạp 1 lần (nhờ dictLoadPromise). Thứ tự ưu tiên:
+        1) Hỏi app trước (_readDictFromApp) — bản đúng nhất
+        2) App không chạy -> dùng bản đóng gói (_readPackagedDict)
+      Gán kết quả vào dictionaryData.
+
+  reloadDictionary()
+      Buộc nạp lại từ app (xoá cache Promise). Dùng sau khi biết app vừa ghi
+      thêm từ, để không đẩy trùng. Trả true nếu lấy được bản mới.
+
+2.2.2. TẦNG 2 — CACHE trong chrome.storage.local
+
+  loadCache()
+      Đọc object "dictCache" từ chrome.storage.local. Trả {} nếu chưa có.
+
+  saveToCache(word, entry)
+      Đọc cache -> thêm/sửa [word] -> ghi lại toàn bộ vào storage.
+
+  pushToSharedDict(word, entry)
+      POST /add_dict với {entries: {word: entry}} để ghi vào dict.json.
+      App không chạy -> thất bại êm (catch -> null), cache vẫn giữ từ đó.
+
+2.2.3. BÓC TÁCH DỮ LIỆU TỪ GOOGLE TRANSLATE
+
+  parseTranslateResponse(data)  — HÀM QUAN TRỌNG NHẤT của file
+      Nhận mảng JSON thô từ Google và trích ra:
+        { ipa, meaning, definitions, synonyms, examples }
+
+      Endpoint translate_a/single trả về MẢNG KHÔNG CÓ NHÃN, vị trí các phần
+      phụ thuộc tham số dt=. Với dt=t,rm,bd,md,ex, cấu trúc là:
+
+        data[0]  -> các đoạn dịch; phiên âm nằm ở ô [i][2] hoặc [i][3]
+        data[1]  -> từ điển theo từ loại:
+                    [pos, [nghĩa tiếng Việt...], [[nghĩa, [từ English nguồn]], ...], ...]
+        data[12] -> định nghĩa gốc (Oxford): [pos, [[định nghĩa, id, ví dụ], ...], ...]
+        data[13] -> câu ví dụ: [[[câu có <b>từ</b>, null...], ...], ...]
+
+      Các bước xử lý:
+
+      (1) BẢN DỊCH: nối tất cả data[0][i][0] lại thành chuỗi nghĩa.
+
+      (2) PHIÊN ÂM (IPA):
+          Thực tế IPA nằm ở index 3 (index 2 gần như luôn null). NHƯNG không
+          hard-code index: hàm duyệt ô index 2..3 của mọi phần tử, chọn ô nào
+          "trông giống IPA" (khớp regex IPA_HINT chứa các ký tự phiên âm
+          /ˈˌəɪʊɛɔæɑʌθðʃʒŋ.../) làm chắc. Cuối cùng bọc trong dấu /.../.
+
+      (3) TỪ ĐỒNG NGHĨA:
+          Lấy từ data[1][i][2][j][1] — danh sách "từ tiếng Anh nguồn" góp vào
+          một nghĩa. Đây là nguồn đồng nghĩa ĐÁNG TIN và MIỄN PHÍ (nằm ngay
+          trong response en->vi vốn đã phải gọi). Bỏ chính từ gốc và từ trùng.
+          Ví dụ "happy" -> blissful, beatific, merry, felicitous...
+
+      (4) ĐỊNH NGHĨA: lấy từ data[12] theo từng từ loại; item[0] là định nghĩa,
+          item[2] là ví dụ gắn với định nghĩa đó.
+
+      (5) VÍ DỤ: ưu tiên data[13]; nếu vắng thì lấy ví dụ cấp định nghĩa ở (4).
+
+      (6) GỘP NGHĨA: giữ trường `meaning` dạng chuỗi như cũ (tương thích ngược),
+          nhưng gắn thêm nhãn từ loại: "- nghĩa (Danh từ)\n- nghĩa (Động từ)".
+
+      Mọi truy cập đều PHÒNG THỦ: kiểm tra Array.isArray, kiểm tra null, vì đây
+      là API không chính thức — chỉ số có thể thiếu, phần tử có thể null.
+
+  posLabel(pos)
+      Dịch nhãn từ loại tiếng Anh sang tiếng Việt qua bảng POS_VI
+      (noun -> "Danh từ", verb -> "Động từ", adjective -> "Tính từ", ...).
+      Không có trong bảng thì giữ nguyên.
+
+  stripTags(html)
+      Bỏ thẻ HTML (<b>, </b>...) mà Google chèn vào câu ví dụ.
+
+2.2.4. LUỒNG "TRA TỪ" (action: LOOKUP)
+
+  Đây là luồng trung tâm. Khi nhận message LOOKUP:
+
+    const seq = ++lookupSeq;          // đánh dấu lần tra này
+    const text = word.toLowerCase().trim();
+    const isStale = () => seq !== lookupSeq;
+
+    B1. Tầng 1: nếu dictFile[text] có -> trả {source:"Offline"}.
+    B2. Tầng 2: nếu cache[text] có   -> trả {source:"Đã lưu"}.
+    B3. Tầng 3: gọi Google:
+         url = .../translate_a/single?client=gtx&sl=auto&tl=vi
+               &dt=t&dt=rm&dt=bd&dt=md&dt=ex&q=<text>
+         - CHỈ 1 REQUEST duy nhất cho tất cả (dịch + IPA + định nghĩa +
+           đồng nghĩa + ví dụ) — tiết kiệm và nhanh.
+         - Sau khi có response: nếu isStale() thì bỏ (kết quả đã cũ).
+         - Nếu Google trả rỗng (parsed.meaning rỗng) -> success:false,
+           KHÔNG ghi vào dict (tránh thẻ rác kiểu "meaning: '-'").
+         - Nếu là từ/cụm từ ngắn (length <= 25) -> saveToCache + pushToSharedDict.
+           Cụm 2-3 từ như "volunteer editors" vẫn là từ vựng hợp lệ -> lưu.
+           Chỉ bỏ qua CÂU DÀI (lưu câu vào từ điển là vô nghĩa).
+         - sendResponse({source: "Google" hoặc "Google (Câu dài)"}).
+
+    return true;  // giữ kênh mở cho xử lý bất đồng bộ
+
+  CHỐNG RACE (isStale): nếu người dùng bôi đen liên tiếp, response của lần
+  TRƯỚC về muộn sẽ bị bỏ — không ghi từ sai vào từ điển.
+
+2.2.5. LUỒNG "LƯU THẺ" & "NHÓM" (GET_GROUPS / SAVE_WORD / CREATE_GROUP)
+
+  Cả 3 đều gọi API cổng 5000 và trả kết quả về cho content script:
+    GET  /groups        -> danh sách deck (dùng để đổ vào ô chọn nhóm)
+    POST /save_word     -> lưu 1 thẻ (payload gồm cả dữ liệu phong phú)
+    POST /create_group  -> tạo deck mới
+
+  Riêng SAVE_WORD kiểm tra kỹ: res.ok && data.success !== false.
+
+2.2.6. LUỒNG "ĐỒNG BỘ TỪ ĐIỂN" (SYNC_DICT)
+
+  Hướng: dict.json -> cache.  Khi app có thể đã được thêm từ ở nơi khác, kéo
+  dict.json về cache. CHỈ thêm từ chưa có, không ghi đè cache sẵn có.
+
+2.2.7. LUỒNG "ĐẨY CACHE LÊN dict.json" (FLUSH_CACHE_TO_DICT) — QUAN TRỌNG
+
+  Đây là CHIỀU NGƯỢC của SYNC_DICT, và là mảnh ghép còn thiếu được bổ sung để
+  sửa lỗi "dict.json mãi không đổi":
+
+      VẤN ĐỀ: từ mới chỉ được ghi vào dict.json NẾU app ĐANG CHẠY đúng lúc tra
+      từ. Nếu app tắt lúc đó, từ chỉ nằm trong chrome.storage.local và TRƯỚC
+      ĐÂY KHÔNG BAO GIỜ được đồng bộ trở lại -> dict.json mãi không đổi.
+
+      GIẢI PHÁP: action này nạp lại dict mới nhất từ app (reloadDictionary),
+      rồi đẩy mọi từ có trong cache mà CHƯA có trong dict.json lên POST
+      /add_dict. Sau khi thành công, cập nhật luôn dictionaryData trong RAM để
+      lần sau không đẩy trùng. Chạy khi app vừa khởi động (xem content.js).
+
+2.2.8. NẠP SẴN KHI KHỞI ĐỘNG
+
+  Dòng cuối file: loadDictionary();  — nạp sẵn dict khi service worker thức
+  dậy, để lần tra đầu tiên không bị chậm.
+
+--------------------------------------------------------------------------------
+2.3. content.js (Content Script + popup bôi đen)
+--------------------------------------------------------------------------------
+
+content.js chạy TRONG mỗi trang web. Nhiệm vụ: bắt thao tác bôi đen, hiện popup
+tra từ, cho phép lưu thẻ / mở app. Đây là file chứa nhiều logic UX tinh tế.
+
+BẢN ĐỒ BIẾN TOÀN CỤC
+--------------------
+  popup            : element DOM của popup hiện tại (null nếu không có)
+  lastSelection    : { text, rect, stamp } — đoạn bôi đen gần nhất
+  selectionStamp   : số tăng mỗi khi selection THỰC SỰ đổi
+  selectionCleared : true khi người dùng đã BỎ chọn (bấm ra ngoài)
+  lookupSeq        : số thứ tự lần tra (chống race)
+  shownStamp       : stamp đã hiển thị lần trước (chống hiện trùng)
+  pendingStamp     : stamp lúc mousedown (để so sánh ở mouseup)
+  suppressResult   : chặn popup "mọc lại" khi đóng lúc request đang bay
+  hasPendingLookup : true khi có 1 request LOOKUP chưa trả về
+  fadingPopup      : element đang mờ dần (tránh chồng 2 popup)
+
+2.3.1. BẮT SELECTION — captureSelection()
+
+  Vì sao phải bắt sớm: nếu chỉ đọc window.getSelection() lúc mouseup thì sai ở
+  2 tình huống rất thường gặp:
+    (1) Bôi đen xong rồi click ra ngoài -> selection đã bị xoá -> đọc rỗng.
+    (2) Bôi ngược (phải->trái) hoặc bôi qua thẻ HTML -> thứ tự anchor/focus
+        ngược -> đoạn lấy ra thiếu ký tự đầu/cuối (nguồn gốc lỗi "olunteer e").
+
+  Hàm này được gọi ở CẢ "selectionchange" và "mouseup", để luôn có bản mới nhất.
+  Logic:
+    - Nếu selection rỗng / đã thu gọn -> selectionCleared = true, return.
+    - Lấy text và rect (getBoundingClientRect) TRƯỚC khi selection bị đổi.
+    - selectionStamp++ (mỗi selection hợp lệ đều tăng stamp, kể cả trùng nội
+      dung -> bôi lại đúng từ trước vẫn hiện popup như mong đợi).
+    - lastSelection = { text, rect, stamp }; selectionCleared = false.
+
+2.3.2. LUỒNG CHUỘT — TRA TỪ + ĐÓNG POPUP
+
+  Thứ tự sự kiện: mousedown -> (selectionchange) -> mouseup -> click
+
+  mousedown (bắt ở capture phase):
+    - Bấm TRONG popup -> bỏ qua (không đóng).
+    - Bấm RA NGOÀI -> đóng popup ngay; đặt pendingStamp = lastSelection.stamp
+      và suppressResult = true (chặn popup của request đang bay).
+
+  mouseup:
+    - Bấm trong popup -> bỏ qua.
+    - currentStamp = lastSelection.stamp.
+    - BỎ QUA (không tra từ) nếu:
+        + selectionCleared (đã bỏ chọn), hoặc
+        + currentStamp === 0, hoặc
+        + currentStamp === pendingStamp (selection KHÔNG đổi từ lúc mousedown
+          -> chỉ là cú click bình thường), hoặc
+        + currentStamp === shownStamp (đã hiện popup cho selection này rồi).
+    - Nếu là selection MỚI: đặt shownStamp = pendingStamp = currentStamp,
+      suppressResult = false, hasPendingLookup = true, seq = ++lookupSeq,
+      rồi gửi message LOOKUP. Trong callback:
+        + Nếu seq === lookupSeq -> hasPendingLookup = false.
+        + Nếu seq !== lookupSeq -> bỏ (có lần bôi đen mới hơn).
+        + Nếu suppressResult -> bỏ (người dùng đã đóng trong lúc chờ).
+        + Ngược lại, nếu success -> showPopup(...).
+
+  ĐÂY CHÍNH LÀ CHỖ SỬA LỖI "bấm ra ngoài mà popup vẫn hiện lại liên tục": bản
+  cũ so sánh bằng CHUỖI RỖNG nên khi trang không xoá selection cũ (bấm chuột
+  phải / bấm vùng trống) nó tưởng là bôi đen mới -> hiện lại popup. Nay dùng
+  "con dấu" (stamp) so sánh số, chính xác tuyệt đối.
+
+2.3.3. PHÍM ESC
+
+  keydown Escape: chỉ xử lý khi đang có popup HOẶC có request đang bay
+  (if (!popup && !hasPendingLookup) return;). Sau đó: đóng popup, đặt
+  pendingStamp = shownStamp = lastSelection.stamp, và suppressResult = true.
+  Nhờ hasPendingLookup, Esc hoạt động ngay cả khi popup CHƯA hiện (đang chờ API).
+
+2.3.4. HÀM closePopup() VÀ fadingPopup
+
+  closePopup() thu nhỏ + mờ dần popup rồi xoá khỏi DOM sau 300ms. Biến
+  fadingPopup giữ element đang mờ, để nếu mở popup mới ngay thì xoá luôn element
+  cũ -> không bao giờ chồng 2 lớp.
+
+2.3.5. HIỆN POPUP — showPopup(word, data, rect, response)
+
+  - Xoá popup cũ + fadingPopup cũ.
+  - Tạo div mới với giao diện "kính mờ" (backdrop-filter: blur) hiện đại.
+  - Nhãn NGUỒN hiển thị ở góc: "Offline" / "Đã lưu" / "Google" / "Google (Câu dài)".
+  - Cấu trúc nội dung:
+      * tiêu đề: từ + nút ✕ (đóng)
+      * phiên âm IPA (màu xanh, font monospace)
+      * nghĩa chính
+      * renderRichData() — phần định nghĩa/đồng nghĩa/ví dụ
+      * khu vực hành động (chọn nhóm + lưu) — chỉ khi từ/cụm <= 25 ký tự
+  - popup.stopPropagation() ở mousedown/mouseup để thao tác trong popup không
+    "rò" ra trang.
+  - Nút ✕ gọi closePopup().
+  - positionPopup() đặt vị trí.
+
+  escapeHtml(str)
+      Escape &, <, >, ", ' để từ vựng/tên nhóm không phá vỡ HTML của popup.
+
+  renderRichData(data)
+      Hiển thị (nếu có):
+        - ĐỊNH NGHĨA · <từ loại> — danh sách gạch đầu dòng
+        - TỪ ĐỒNG NGHĨA — dạng chip màu xanh
+        - VÍ DỤ — in nghiêng
+      Thẻ cũ chỉ có ipa + meaning nên hàm phải chịu được dữ liệu thiếu
+      (kiểm tra Array.isArray trước khi duyệt).
+
+  sectionBlock(heading, innerHtml)
+      Tạo khối có tiêu đề nhỏ + đường kẻ trên, dùng lại cho cả 3 mục.
+
+2.3.6. KHU VỰC LƯU THẺ
+
+  renderActionArea(popupEl, word, data, attempt)
+      Gửi GET_GROUPS để lấy danh sách nhóm.
+        - Thất bại lần đầu -> thử lại 1 lần sau 1.5s (phòng khi app vừa bật).
+        - Vẫn thất bại -> showAppOffline().
+        - Thành công -> flushCacheToDict() (app vừa online) + renderSaveForm().
+
+  flushCacheToDict()
+      Gửi FLUSH_CACHE_TO_DICT 1 lần mỗi phiên (cờ hasFlushedDict). Nếu thất bại
+      (app còn tắt) -> reset cờ để thử lại lần sau. Được gọi ở 3 nơi:
+        (a) ngay khi content script nạp,
+        (b) trong renderActionArea khi app online,
+        (c) trong showAppOffline khi poll thấy app lên.
+
+  showAppOffline(actionArea, word, data)
+      Hiện "🚫 Chưa kết nối được App" + nút "Mở Flashcard App". Khi bấm:
+        - openDesktopApp() gọi ĐỒNG BỘ trong cú click (giữ "user gesture" để
+          trình duyệt cho phép mở protocol flashcard://).
+        - Poll GET_GROUPS mỗi 1s, tối đa 12 lần, chờ app khởi động.
+        - Khi app lên -> clearInterval + flushCacheToDict() + renderSaveForm().
+
+  renderSaveForm(actionArea, word, data, groups)
+      Hiện: ô chọn nhóm (<select>) + nút "+" (tạo nhóm) + nút "Lưu vào Flashcard".
+      - Nút "+" mở/đóng ô nhập tên nhóm mới.
+      - executeCreateGroup(name, cb): tạo nhóm, thêm option mới vào select.
+      - executeSaveCard(groupId): gửi SAVE_WORD KÈM cả definitions, synonyms,
+        examples (chỉ gửi khi có dữ liệu). Thiếu 3 trường này thì thẻ lưu xong
+        sẽ mất hết phần trực quan dù popup đã tra được.
+      - Nút Lưu: nếu đang có tên nhóm mới -> tạo nhóm rồi lưu; nếu chưa chọn
+        nhóm -> cảnh báo "Chọn hoặc tạo nhóm trước!"; ngược lại lưu vào nhóm
+        đang chọn. Nút đổi trạng thái: "Đang lưu..." -> "Đã lưu ✓" (xanh) hoặc
+        "Lỗi lưu thẻ" (đỏ).
+
+2.3.7. VỊ TRÍ POPUP — positionPopup(popupEl, rect)
+
+  Đặt popup dưới đoạn bôi đen 10px. Nếu tràn mép phải/dưới màn hình thì dịch
+  vào trong. Nếu không đủ chỗ dưới mà trên rộng hơn thì đặt lên trên. Có hiệu
+  ứng xuất hiện (translateY + scale + opacity) qua requestAnimationFrame.
+
+
+================================================================================
+PHẦN 3 — FLASH CARD APP (Python / Tkinter)
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1. config.py — CẤU HÌNH ĐƯỜNG DẪN
+--------------------------------------------------------------------------------
+
+  BASE_DIR = Path(__file__).resolve().parent           -> Flash_Card_App/
+  DATA_DIR = BASE_DIR / "data" / "storage"
+  DECKS_DIR = DATA_DIR / "decks"                       -> nơi lưu deck *.json
+  DB_FILE  = DATA_DIR / "test.db"                      -> SQLite tiến độ học
+  DICT_FILE = BASE_DIR.parent / "Browser_Extension" / "dict.json"
+                                                       -> TỪ ĐIỂN DÙNG CHUNG
+
+  Cuối file tự mkdir DATA_DIR và DECKS_DIR (exist_ok) để chắc chắn thư mục tồn
+  tại trước khi app ghi file.
+
+  CHÚ THÍCH QUAN TRỌNG: DICT_FILE trỏ RA NGOÀI thư mục app (sang
+  Browser_Extension/). Đây là chủ ý — để app và extension dùng CHUNG một file.
+
+--------------------------------------------------------------------------------
+3.2. main.py — ĐIỂM KHỞI ĐỘNG
+--------------------------------------------------------------------------------
+
+main.py dựng toàn bộ hệ thống và nối các thành phần lại với nhau.
+
+3.2.1. class UiBridge
+
+  VẤN ĐỀ: HTTP server chạy ở thread nền. Tkinter KHÔNG thread-safe — nếu thread
+  server gọi trực tiếp widget, app sẽ crash hoặc treo ngẫu nhiên.
+
+  GIẢI PHÁP: UiBridge là cầu nối an toàn giữa thread server và main thread.
+    - Dùng queue.Queue chứa các callback.
+    - root.after(interval, self._poll) định kỳ (mặc định 150ms) lấy callback
+      ra và chạy TRÊN MAIN THREAD.
+    - post(callback) được thread server gọi để đẩy việc vào queue.
+
+3.2.2. Single-instance guard
+
+  _another_instance_running()
+      Gọi GET /ping (timeout 0.6s). Nếu 200 -> app đã chạy.
+  _focus_existing_instance()
+      Gọi POST /focus để đưa cửa sổ cũ lên trước.
+  main()
+      Nếu đang chạy -> chỉ focus, KHÔNG mở cửa sổ mới (nhờ vậy bấm "Mở App"
+      trên extension nhiều lần vẫn an toàn).
+
+3.2.3. Khởi tạo các thành phần
+
+  database = Database(DB_FILE);  database.initialize()   -> tạo bảng nếu chưa có
+  json_repo = JsonRepository(DECKS_DIR)
+  deck_manager = DeckManager(json_repo)
+  card_manager = CardManager(json_repo, database)
+  shared_dict  = SharedDictionary(DICT_FILE)             -> từ điển dùng chung
+
+3.2.4. sync_dict_into_app()
+
+  Đọc dict.json rồi gọi DeckManager.import_from_dict -> biến mỗi từ thành 1 thẻ
+  trong deck "Từ điển". Gọi lúc khởi động VÀ mỗi khi extension lưu từ mới.
+
+3.2.5. Dựng UI
+
+  root = tk.Tk(); title "User 1 - Anki"; geometry 820x760; minsize 300x500.
+  app = MainWindow(root, deck_manager, card_manager, database).
+  ui_bridge = UiBridge(root).
+
+3.2.6. Callback từ server
+
+  on_external_change(): extension vừa lưu từ mới -> sync_dict_into_app() +
+      ui_bridge.post(app.refresh_current_view).
+  on_external_focus():  extension yêu cầu đưa app lên trước ->
+      ui_bridge.post(app.focus_window).
+
+3.2.7. Khởi động server & đóng app
+
+  server = ApiServer(deck_manager, card_manager,
+                     on_change=on_external_change,
+                     on_focus=on_external_focus,
+                     dictionary=shared_dict)   <-- DÙNG CHUNG instance!
+  server.start()
+  on_close(): server.stop(); root.destroy(), gắn vào WM_DELETE_WINDOW.
+  root.mainloop()
+
+  LƯU Ý: truyền dictionary=shared_dict là ĐIỂM SỬA LỖI quan trọng. Nếu để
+  server tự tạo instance riêng thì cache RAM của hai bên lệch nhau, khiến từ
+  mới thêm qua /add_dict không được nạp lại vào app.
+
+--------------------------------------------------------------------------------
+3.3. server.py — CẦU NỐI HTTP + TỪ ĐIỂN DÙNG CHUNG
+--------------------------------------------------------------------------------
+
+File quan trọng nhất phía app. Dùng CHỈ thư viện chuẩn (http.server) nên không
+cần cài gì thêm.
+
+3.3.1. Hằng số
+
+  BRIDGE_HOST = "127.0.0.1"      chỉ nghe máy cục bộ (an toàn)
+  BRIDGE_PORT = 5000             phải khớp API_BASE trong background.js
+  DEFAULT_GROUP_NAME = "Extension"   deck mặc định khi extension lưu mà chưa
+                                     chọn nhóm
+  _INVALID_FILENAME = regex loại bỏ ký tự không hợp lệ trong tên file
+
+3.3.2. _safe_deck_name(name)
+
+  Vì tên deck = tên file json, hàm này:
+    - cắt khoảng trắng, thay ký tự \ / : * ? " < > | và ký tự điều khiển bằng "_"
+    - cắt dấu chấm/cách ở cuối (Windows không cho tên kết thúc bằng ".")
+    - giới hạn 80 ký tự; rỗng thì dùng DEFAULT_GROUP_NAME.
+
+3.3.3. class SharedDictionary — TỪ ĐIỂN DÙNG CHUNG
+
+  Bọc file Browser_Extension/dict.json. Giữ đúng cấu trúc gốc
+  { "word": {"ipa": ..., "meaning": ...} }.
+
+  __init__(path): lưu path, tạo threading.Lock, _cache = None.
+  load(): trả cache trong RAM; nạp từ file lần đầu.
+  _read_file(): đọc file JSON; lỗi/không tồn tại -> trả {} (không crash).
+  add_entries(entries): trả (số từ mới, tổng số từ).
+      - Bỏ qua key rỗng hoặc value không phải dict.
+      - KHÔNG GHI ĐÈ từ đã có -> ưu tiên dữ liệu cũ, tránh làm hỏng nghĩa.
+      - Chỉ ghi file khi thực sự có từ mới.
+  _write_file(data): GHI KIỂU ATOMIC — ghi ra file tạm .json.tmp rồi
+      tmp.replace(path). Nhờ vậy nếu bị ngắt giữa chừng thì dict.json gốc
+      KHÔNG bị hỏng.
+
+3.3.4. class ApiServer — HTTP SERVER
+
+  __init__(deck_manager, card_manager, on_change=None, on_focus=None,
+           host, port, dictionary=None)
+      - Nhận deck_manager/card_manager từ ngoài (dùng chung với UI).
+      - dictionary: nếu None thì tự tạo SharedDictionary(DICT_FILE), nhưng main.py
+        luôn truyền instance dùng chung.
+      - _write_lock: khoá ghi file khi nhiều request cùng lúc.
+
+  Truy vấn dữ liệu:
+    _decks()               -> deck_manager.get_decks()
+    _find_deck_by_id(id)   -> tìm deck theo id (ép int, sai -> None)
+    _find_deck_by_name(n)  -> tìm deck theo tên
+    _get_or_create_deck(n) -> chuẩn hoá tên, tìm hoặc tạo mới
+    list_groups()          -> [{id, name}] cho extension
+
+  Từ điển:
+    get_dict()   -> {"success", "count", "dict": data}
+    add_dict(entries) -> dictionary.add_entries; nếu có từ mới thì _notify()
+                         (báo UI nạp lại); trả {"success", "added", "count"}
+
+  create_group(name)
+      _get_or_create_deck -> _notify -> trả {"id", "name"}.
+
+  save_word(payload)
+      - Lấy word, meaning, ipa; thiếu word -> lỗi.
+      - Gộp IPA + nghĩa thành "answer" của thẻ: "ipa\nmeaning".
+      - Gom dữ liệu phong phú vào `extra`: ipa, definitions, synonyms, examples
+        (chỉ nhận nếu là list không rỗng).
+      - Dưới _write_lock:
+          * Tìm deck theo group_id; không có -> dùng deck mặc định "Extension".
+          * Nếu deck đã có thẻ cùng `question` (từ) -> trả duplicate, không thêm.
+          * Ngược lại gọi card_manager.add_card(deck_id, word, answer, extra).
+      - _notify() -> trả {success, duplicate, deck, card_id}.
+
+  focus()  : gọi on_focus (đưa cửa sổ lên trước).
+  _notify(): gọi on_change (thông báo dữ liệu đổi) — có try/except để lỗi UI
+             không làm sập server.
+
+  start()
+      Tạo _BridgeServer((host, port), _BridgeHandler). Nếu cổng bị chiếm (OSError)
+      -> in cảnh báo nhưng KHÔNG crash (app vẫn chạy, chỉ extension không kết nối
+      được). Gán self._httpd.api = self; daemon_threads = True; chạy serve_forever
+      trong thread daemon tên "flashcard-bridge".
+  stop()
+      httpd.shutdown() + server_close().
+
+3.3.5. class _BridgeServer(ThreadingHTTPServer)
+
+  Ghi đè handle_error(): BỎ QUA (không in traceback) các lỗi ConnectionError,
+  TimeoutError, BrokenPipeError. Vì trình duyệt/extension thường huỷ request
+  giữa chừng (đóng popup, timeout) — đây là chuyện bình thường, không phải lỗi.
+
+3.3.6. class _BridgeHandler(BaseHTTPRequestHandler)
+
+  log_message(): tắt log mặc định cho gọn console.
+  api (property): trả self.server.api (tham chiếu ApiServer).
+  _send_json(payload, status): trả JSON, kèm header CORS
+      (Access-Control-Allow-Origin: *, Allow-Headers, Allow-Methods).
+  _read_json(): đọc body theo Content-Length, parse JSON (lỗi -> {}).
+  _path(): lấy path, bỏ "/" cuối.
+
+  ROUTES:
+    do_OPTIONS  -> trả {"success": true} (preflight CORS)
+    do_GET:
+      /           hoặc /ping   -> {"success", "running", "app"}
+      /groups                  -> {"groups": [...]}
+      /dict                    -> get_dict()
+      khác                     -> 404
+    do_POST:
+      /create_group -> create_group(name); lỗi -> 400
+      /save_word    -> save_word(data); success -> 200, ngược lại -> 400
+      /add_dict     -> add_dict(entries)
+      /focus        -> focus()
+      khác          -> 404
+
+--------------------------------------------------------------------------------
+3.4. data/json_repository.py — TẦNG LƯU DECK (JSON)
+--------------------------------------------------------------------------------
+
+Mỗi deck là 1 file .json trong DECKS_DIR, tên file = tên deck.
+
+  __init__(folder): lưu Path, mkdir nếu chưa có.
+  _get_path(deck_name): folder / f"{deck_name}.json"
+  _read_file(path): đọc JSON; lỗi -> None.
+  _write_file(path, data): ghi JSON, ensure_ascii=False, indent=4.
+  get_decks(): duyệt mọi *.json, đọc và trả list (bỏ file lỗi).
+  get_deck(deck_id): tìm deck theo id.
+  get_deck_by_name(name): đọc trực tiếp file theo tên.
+  add_deck(deck) / update_deck(deck): ghi file theo deck["name"].
+  next_deck_id(): max(id) + 1 (mặc định 0).
+  next_card_id(deck): max(id thẻ trong deck) + 1.
+  delete_deck(name): xoá file.
+  rename_deck(old, new): đọc file cũ, đổi name, ghi file mới, xoá file cũ.
+  deck_exists(name): kiểm tra file tồn tại.
+
+  ĐIỂM CHÚ Ý: ID được tính bằng max + 1 dựa trên dữ liệu hiện có (không dùng
+  AUTO_INCREMENT). Vì vậy sau khi xoá deck/thẻ, ID có thể bị tái sử dụng — chấp
+  nhận được với quy mô đồ án.
+
+--------------------------------------------------------------------------------
+3.5. data/database.py — SQLITE (TIẾN ĐỘ HỌC)
+--------------------------------------------------------------------------------
+
+Chỉ lưu TIẾN ĐỘ HỌC (không lưu nội dung thẻ — nội dung nằm trong JSON).
+
+  Bảng card_progress(
+      question TEXT PRIMARY KEY,   <-- dùng câu hỏi làm khoá (không phải id)
+      difficulty INTEGER,
+      day_to_review TEXT
+  )
+
+  connect(): sqlite3.connect(db_file)
+  initialize(): CREATE TABLE IF NOT EXISTS + commit
+  save_progress(question, difficulty, day_to_review):
+      INSERT ... ON CONFLICT(question) DO UPDATE — ghi đè nếu đã có.
+  get_progress(card_id):
+      LƯU Ý: câu truy vấn dùng "WHERE id = ?" nhưng bảng KHÔNG có cột id — đây
+      là hàm hiện KHÔNG được dùng ở đâu (dead code), nên không gây lỗi. Hàm
+      get_all_progress() mới là hàm thực sự được dùng.
+  get_all_progress():
+      SELECT question, difficulty, day_to_review -> dict {question: {...}}.
+
+  Chọn "question" làm khoá chính là quyết định thiết kế: hai thẻ ở hai deck
+  khác nhau nhưng cùng từ sẽ chia sẻ tiến độ. Với đồ án từ vựng điều này chấp
+  nhận được (một từ thường chỉ học một lần).
+
+--------------------------------------------------------------------------------
+3.6. logic/deck_manager.py — NGHIỆP VỤ DECK
+--------------------------------------------------------------------------------
+
+  __init__(json_repo)
+  get_decks() / get_deck(id) / get_deck_by_name(name)  -> uỷ quyền cho repo
+  create_deck(name): nếu tên đã tồn tại -> None; ngược lại tạo
+      {id: next_deck_id, name, cards: []} và add_deck.
+  card_count(deck): len(deck["cards"])
+  delete_deck(name) / rename_deck(old,new) (kiểm tra trùng tên)
+
+  import_from_dict(dict_data, deck_name="Từ điển")   <-- HÀM QUAN TRỌNG
+      Biến từ điển chung thành một deck trong app.
+      - Nếu dict rỗng -> (0, 0, deck_name).
+      - Tìm deck theo tên; chưa có -> create_deck rồi lấy lại bản tươi.
+      - existing = tập hợp các `question` đã có -> tránh nhập trùng.
+      - Với mỗi (word, entry):
+          * Đọc ipa, meaning; đọc definitions (giữ pos + danh sách định nghĩa),
+            synonyms, examples — chỉ nhận nếu đúng kiểu dữ liệu.
+          * Bỏ qua bản ghi rác: nếu không có ipa VÀ meaning ∈ ("", "-") VÀ không
+            có definitions -> skip (Google trả rỗng).
+          * answer = "ipa\nmeaning" (hoặc ipa / meaning / "(chưa có nghĩa)").
+          * card = {id, question: word, answer, source: "dict"}.
+          * Chỉ thêm definitions/synonyms/examples khi có dữ liệu (để file json
+            của thẻ nhập tay không bị phình khoá rỗng).
+      - added > 0 -> repo.update_deck(deck).
+      - Trả (số thẻ mới, tổng số thẻ, tên deck).
+
+      CHỈ THÊM, KHÔNG SỬA/XOÁ thẻ cũ -> gọi lại nhiều lần vẫn an toàn, và tiến
+      độ học trong test.db không bị mất.
+
+--------------------------------------------------------------------------------
+3.7. logic/card_manager.py — NGHIỆP VỤ THẺ
+--------------------------------------------------------------------------------
+
+  __init__(json_repo, database)
+  get_cards(deck_id): deck["cards"] (hoặc [])
+  add_card(deck_id, question, answer, extra=None)
+      - Tìm deck; không có -> None.
+      - card = {id, question, answer}.
+      - Nếu extra là dict: thêm ipa/definitions/synonyms/examples khi có giá
+        trị (chỉ ghi khi có -> thẻ cũ không bị thêm khoá rỗng).
+      - deck["cards"].append(card); repo.update_deck(deck).
+      - db.save_progress(question, None, None)  -> khởi tạo tiến độ.
+      - Trả card.
+      THAM SỐ extra LÀ MỞ RỘNG TƯƠNG THÍCH NGƯỢC: code cũ gọi add_card(3 tham
+      số) vẫn chạy y nguyên.
+
+  review_card(card, difficulty)
+      Lịch ôn tập theo mức: 1(Again)->0 ngày, 2(Hard)->1, 3(Good)->3, 4(Easy)->7.
+      review_date = hôm nay + số ngày -> db.save_progress(question, difficulty,
+      review_date.isoformat()).
+
+--------------------------------------------------------------------------------
+3.8. ui/theme.py — BẢNG MÀU
+--------------------------------------------------------------------------------
+
+  BG = "#f7f7f7"      nền chính
+  WHITE = "#ffffff"   nền thẻ/khung
+  TEXT = "#222222"    chữ chính
+  SECONDARY = "#888888" chữ phụ
+  BLUE = "#1355d8"    màu nhấn
+  BORDER = "#dddddd"  đường viền
+  SELECTED = "#e3e3e3"
+  BUTTON = "#f5f5f5"
+
+  Mọi view import * từ theme để dùng thống nhất.
+
+--------------------------------------------------------------------------------
+3.9. ui/main_window.py — CỬA SỔ CHÍNH
+--------------------------------------------------------------------------------
+
+  __init__(root, deck_manager, card_manager, database):
+      lưu tham chiếu; current_view=None; selected_deck=None;
+      dựng menu, navigation, content, bottom; hiện màn Decks.
+
+  _build_navigation(): hàng nút Decks / Manage Decks / Browse / Stats / Sync.
+      (Stats và Sync hiện là blank_action — chỗ dành sẵn cho tương lai.)
+
+  _build_content(): frame chứa nội dung từng màn (nơi các View được pack vào).
+
+  _build_bottom(): hàng nút dưới cùng: Get Shared / Create Deck / Import File.
+
+  clear_content(): xoá mọi widget con trong content (đổi màn).
+
+  show_decks()   -> DeckView
+  show_add()     -> AddView (thêm thẻ chung)
+  open_deck(deck): lấy cards; rỗng -> show_add_for_deck, ngược lại -> StudyView
+  show_add_for_deck(deck) -> AddView với selected_deck
+  create_deck(): hỏi tên -> deck_manager.create_deck -> show_decks
+  show_browse()  -> CardView
+  open_manage_window() -> ManageWindow
+
+  refresh_current_view()   <-- DÙNG CHO ĐỒNG BỘ
+      Khi extension vừa lưu từ mới, chỉ làm mới màn DẠNG DANH SÁCH
+      (DeckView / CardView). Các màn đang nhập liệu (Add) hoặc đang học (Study)
+      được giữ nguyên để không làm gián đoạn người dùng.
+
+  focus_window()  <-- DÙNG CHO "MỞ APP"
+      deiconify + lift + tạm đặt topmost 400ms + focus_force, để cửa sổ app
+      nảy lên trước mặt người dùng.
+
+--------------------------------------------------------------------------------
+3.10. ui/deck_view.py — DANH SÁCH DECK
+--------------------------------------------------------------------------------
+
+  Bảng gồm cột Deck / New / Learn / Due. Với mỗi deck, tạo một hàng: tên deck
+  (màu xanh, con trỏ hand) + 3 số (hiện là 0,0,số thẻ) + biểu tượng ⚙.
+  Nhấp ĐÚP vào hàng/tên/⚙ -> on_open_deck(deck) (mở deck để học).
+
+  Ghi chú: các cột New/Learn/Due hiện hiển thị giá trị tĩnh [0, 0, len(cards)];
+  đây là chỗ dành sẵn, chưa tính toán thống kê thật.
+
+--------------------------------------------------------------------------------
+3.11. ui/add_view.py — THÊM THẺ THỦ CÔNG
+--------------------------------------------------------------------------------
+
+  Form: chọn Deck (Combobox readonly) + Question (Text 5 dòng) + Answer (Text
+  5 dòng) + nút "Add Card".
+  add_card():
+      kiểm tra đã chọn deck chưa; question/answer không được rỗng (cảnh báo);
+      gọi card_manager.add_card(deck_id, question, answer);
+      xoá trắng ô nhập; thông báo "Card added."
+
+  Nếu được mở từ deck rỗng (selected_deck), combobox tự chọn sẵn deck đó.
+
+--------------------------------------------------------------------------------
+3.12. ui/card_view.py — DUYỆT THẺ (BROWSE)
+--------------------------------------------------------------------------------
+
+  Màn 3 cột, dùng grid để cố định bề rộng:
+    Cột 0 (180px): bộ lọc — Combobox chọn Deck (All Decks + các deck) + 1 ô lọc
+                   phụ (chưa gán nhãn/giá trị — chỗ dành sẵn).
+    Cột 1 (giãn) : bảng Treeview 3 cột CARD NAME / DUE / DECK, có scrollbar.
+    Cột 2 (300px): chi tiết — Word (đậm, lớn) + Definition (nghĩa).
+
+  load_cards():
+      progress = database.get_all_progress()      (từ SQLite)
+      decks = deck_manager.get_decks()            (từ JSON)
+      Gộp lại thành all_cards: mỗi phần tử có id, question, answer, deck,
+      deck_id, day_to_review (tra theo "question").
+      Cập nhật bộ lọc deck, đặt "All Decks", refresh danh sách.
+
+  refresh_card_list(): xoá bảng cũ, duyệt all_cards, lọc theo deck đang chọn,
+      chèn dòng với giá trị (question, due hoặc "-", deck).
+
+  on_card_selected(): tìm card theo tree id -> hiện chi tiết bên phải.
+  make_tree_id(card): f"{deck_id}_{card_id}" — duy nhất trên toàn app.
+  find_card_by_tree_id(tree_id): tra ngược về card.
+
+  Đây là nơi người dùng thấy TỔNG HỢP mọi thẻ từ mọi deck + hạn ôn tập (DUE).
+
+--------------------------------------------------------------------------------
+3.13. ui/study_view.py — MÀN HỌC THẺ (quan trọng)
+--------------------------------------------------------------------------------
+
+  Đây là màn hình "trực quan hoá" dữ liệu phong phú. Giữ nguyên luồng học
+  (Show Answer -> Again/Hard/Good/Easy) nhưng bổ sung hiển thị:
+      từ loại, định nghĩa, từ đồng nghĩa, ví dụ.
+
+  __init__(parent, deck, cards, card_manager, on_back): index=0,
+      answer_visible=False, rồi _build().
+
+  _build():
+      - Nút "< Decks" (quay lại)
+      - Tiêu đề tên deck
+      - Label tiến độ "Card x / y"
+      - card_frame (khung trắng, viền)
+          * question_label : câu hỏi (lớn, giữa)
+          * ipa_label      : phiên âm (xanh, monospace) — hiện cùng câu hỏi
+          * answer_label   : nghĩa chính
+          * detail_wrap    : khung CUỘN chứa định nghĩa/đồng nghĩa/ví dụ
+                             (Canvas + Scrollbar + Frame con)
+          * show_button    : "Show Answer"
+          * answer_frame   : 4 nút Again/Hard/Good/Easy
+
+  load_card():
+      - question_label = câu hỏi
+      - ipa_label = _extract_ipa(card)
+      - ẩn answer/detail/answer_frame; hiện lại nút Show Answer
+      - cập nhật tiến độ "Card x / y"
+
+  _extract_ipa(card):
+      Ưu tiên trường card["ipa"]. Nếu không có, tách từ dòng đầu của answer
+      (thẻ cũ lưu dạng "/ipa/\n- nghĩa") — nếu dòng đầu bọc trong /.../ thì
+      coi đó là IPA. Đây là cách hỗ trợ cả dữ liệu MỚI lẫn thẻ CŨ.
+
+  show_answer():
+      thu gọn câu hỏi; answer_label = _clean_answer(card); _build_details(card);
+      ẩn nút Show Answer; hiện 4 nút đánh giá.
+
+  _clean_answer(card):
+      Bỏ dòng phiên âm ở đầu answer (vì đã hiển thị riêng ở ipa_label), tránh
+      lặp IPA hai lần.
+
+  _build_details(card):
+      Xoá nội dung cũ trong detail_inner. Đọc definitions/synonyms/examples.
+      - Với mỗi block định nghĩa -> _add_section_header("Định nghĩa · <pos>")
+        + _add_bullet cho từng định nghĩa.
+      - Từ đồng nghĩa -> _add_section_header("Từ đồng nghĩa") + _add_chips.
+      - Ví dụ -> _add_section_header("Ví dụ") + _add_bullet(in nghiêng).
+      - Nếu KHÔNG có nội dung nào -> pack_forget detail_wrap (ẩn hẳn, không hiện
+        khung rỗng).
+
+  _add_section_header(text): label nhỏ, chữ hoa, màu phụ.
+  _add_bullet(text, italic): dòng có dấu • xanh + text.
+  _add_chips(items): hiển thị danh sách dạng "chip", tự NGẮT DÒNG khi hết chỗ
+      (ước lượng bề rộng ~9px/ký tự + padding, ngưỡng 520px).
+
+  answer(difficulty):
+      card_manager.review_card(card, difficulty); index++; hết -> _finished();
+      ngược lại load_card().
+
+  _finished(): xoá nội dung thẻ, hiện "Session complete!" + nút Back to Decks.
+
+--------------------------------------------------------------------------------
+3.14. ui/manage_window.py — QUẢN LÝ DECK (Toplevel)
+--------------------------------------------------------------------------------
+
+  Cửa sổ con 450x450: Listbox danh sách deck + 3 nút Create/Rename/Delete +
+  label thông tin.
+
+  create_deck(): hỏi tên -> deck_manager.create_deck; trùng -> cảnh báo.
+  rename_deck(): chọn deck -> hỏi tên mới -> deck_manager.rename_deck.
+  delete_deck(): chọn deck -> xác nhận -> deck_manager.delete_deck.
+  show_info(): hiện "Deck: <tên>\nTotal cards: <n>".
+  Mọi thao tác thành công đều gọi refresh_callback (làm mới màn Decks chính).
+
+
+================================================================================
+PHẦN 4 — CƠ CHẾ PROTOCOL flashcard://
+================================================================================
+
+4.1. MỤC ĐÍCH
+
+  Cho phép extension (hoặc bất kỳ trang web nào) MỞ app desktop. Trình duyệt
+  không thể tự chạy file .exe/.bat vì lý do bảo mật — nên ta đăng ký một custom
+  URL protocol với Windows; Windows sẽ là bên chạy lệnh.
+
+4.2. install_protocol.py
+
+  _winreg(): import winreg (chỉ có trên Windows).
+  _paths(): base = thư mục chứa script; run_bat = base/Flash_Card_App/run_app.bat.
+
+  install():
+      - Kiểm tra run_app.bat tồn tại.
+      - command = f'"{run_bat}" "%1"'
+      - Ghi vào HKEY_CURRENT_USER\Software\Classes\flashcard :
+          (default) = "URL:Flashcard App Protocol"
+          "URL Protocol" = ""            <-- đánh dấu đây là URL protocol
+        và .../flashcard\shell\open\command :
+          (default) = command            <-- lệnh chạy khi mở link
+      - CHỈ ghi vào HKEY_CURRENT_USER nên KHÔNG cần quyền Administrator.
+
+  uninstall(): xoá lần lượt các key con rồi key gốc (bỏ qua FileNotFoundError).
+
+  main(): chỉ chạy trên win32; --uninstall/-u thì gỡ, ngược lại cài.
+
+4.3. install_protocol.bat
+
+  cd về thư mục script, gọi "python install_protocol.py %*" (hoặc "py ..." nếu
+  không có python), rồi pause để người dùng đọc kết quả. Nhấp đúp là cài xong.
+
+4.4. run_app.bat
+
+  cd /d "%~dp0" (về đúng thư mục Flash_Card_App để import hoạt động), rồi:
+      where py -> có thì "py main.py", không thì "python main.py".
+  Ưu tiên launcher "py" vì ổn định hơn và tránh alias Microsoft Store.
+
+4.5. CÁCH EXTENSION KÍCH HOẠT
+
+  content.js -> openDesktopApp(): tạo thẻ <a href="flashcard://open"> ẩn, click,
+  xoá. Phải gọi ĐỒNG BỘ trong handler của sự kiện click để giữ "user activation"
+  — nếu không Chrome sẽ chặn.
+
+
+================================================================================
+PHẦN 5 — DỮ LIỆU & ĐỊNH DẠNG FILE
+================================================================================
+
+5.1. Browser_Extension/dict.json — TỪ ĐIỂN DÙNG CHUNG
+
+  Cấu trúc gốc (tương thích ngược):
+      {
+        "hello": { "ipa": "/həˈlō/", "meaning": "- xin chào" },
+        ...
+      }
+
+  Cấu trúc mở rộng (chỉ thêm khoá khi có dữ liệu):
+      {
+        "primary": {
+          "ipa": "/ˈprīˌmerē/",
+          "meaning": "- căn nguyên (tính từ)\n- phần cơ bản (danh từ)",
+          "definitions": [
+            { "pos": "tính từ", "definitions": ["of chief importance; principal.", ...] },
+            { "pos": "danh từ", "definitions": ["(in the US) a preliminary election...", ...] }
+          ],
+          "synonyms": ["radical", "fundamental", "ultimate", ...],
+          "examples": ["the primary stage of their political education", ...]
+        }
+      }
+
+  Quy tắc ghi: KHÔNG ghi đè từ đã có (ưu tiên bản cũ). Ghi kiểu atomic.
+
+5.2. Flash_Card_App/data/storage/decks/<tên deck>.json — DECK
+
+  {
+    "id": 3,
+    "name": "Từ điển",
+    "cards": [
+      {
+        "id": 1,
+        "question": "primary",
+        "answer": "/ˈprīˌmerē/\n- căn nguyên (tính từ)...",
+        "source": "dict",
+        "definitions": [ { "pos": "tính từ", "definitions": [...] } ],
+        "synonyms": [...],
+        "examples": [...]
+      }
+    ]
+  }
+
+  Thẻ nhập tay chỉ có {id, question, answer} — các khoá mở rộng là tuỳ chọn.
+
+5.3. Flash_Card_App/data/storage/test.db — SQLITE
+
+  Bảng card_progress(question TEXT PRIMARY KEY, difficulty INTEGER,
+  day_to_review TEXT). Lưu tiến độ học theo từ (question).
+
+5.4. CHROME.STORAGE.LOCAL — CACHE EXTENSION
+
+  Khoá "dictCache" -> object { word: entry } giống dict.json. Là tầng đệm giữa
+  dict.json và Google, tồn tại độc lập với app.
+
+
+================================================================================
+PHẦN 6 — CÁC LUỒNG NGHIỆP VỤ CHÍNH
+================================================================================
+
+6.1. LUỒNG "BÔI ĐEN TRA TỪ" (online, từ mới)
+
+  1. Người dùng bôi đen từ trên trang.
+  2. selectionchange/mouseup -> captureSelection() tăng stamp, lưu lastSelection.
+  3. mouseup: stamp mới -> gửi LOOKUP cho background.js.
+  4. background.js: dict.json -> cache -> Google (3 tầng).
+  5. Google trả về -> parseTranslateResponse -> {ipa, meaning, definitions,
+     synonyms, examples}.
+  6. Là từ ngắn -> saveToCache + pushToSharedDict (nếu app chạy).
+  7. content.js hiện popup, gắn nhãn "Google".
+
+6.2. LUỒNG "TRA LẠI TỪ ĐÃ BIẾT" (offline)
+
+  1..3 như trên.
+  4. background.js: tìm thấy trong dict.json -> nhãn "Offline" (không cần mạng).
+     Hoặc thấy trong cache -> nhãn "Đã lưu".
+
+6.3. LUỒNG "LƯU THẺ VÀO APP"
+
+  1. Popup hiện form (nhóm + Lưu). Lấy nhóm qua GET_GROUPS.
+  2. Người dùng chọn/tạo nhóm, bấm "Lưu vào Flashcard".
+  3. content.js gửi SAVE_WORD (kèm definitions/synonyms/examples nếu có).
+  4. background.js POST /save_word.
+  5. server.py save_word: gộp answer, gom extra, add_card -> ghi deck JSON +
+     SQLite; trả kết quả.
+  6. server._notify() -> main.py on_external_change -> sync_dict_into_app() +
+     refresh_current_view() -> thẻ hiện ra trong app.
+
+6.4. LUỒNG "MỞ APP TỪ EXTENSION"
+
+  1. App chưa chạy -> popup hiện "Mở Flashcard App".
+  2. Bấm -> openDesktopApp() mở flashcard://open (đồng bộ trong click).
+  3. Windows chạy run_app.bat -> python main.py.
+  4. content.js poll GET_GROUPS mỗi 1s (tối đa 12 lần).
+  5. App lên -> form lưu hiện ra ngay; flushCacheToDict() đẩy cache vào dict.json.
+  6. Nếu app ĐÃ chạy sẵn -> main.py phát hiện qua /ping, chỉ focus cửa sổ cũ.
+
+6.5. LUỒNG "ĐỒNG BỘ TỪ ĐIỂN HAI CHIỀU" (mấu chốt)
+
+  Chiều A (dict.json -> cache): action SYNC_DICT. Kéo từ mới trong dict.json
+      vào cache. Chỉ thêm, không ghi đè.
+
+  Chiều B (cache -> dict.json): action FLUSH_CACHE_TO_DICT. Khi app vừa bật,
+      đẩy mọi từ trong cache còn thiếu trong dict.json lên /add_dict.
+
+  Vì sao cần cả hai: nếu app TẮT lúc tra từ, từ chỉ nằm trong cache. Chiều B
+  đảm bảo từ đó cuối cùng vẫn vào dict.json (khi app bật) và GIỮ NGUYÊN sau khi
+  tắt app. Đây chính là lỗi "dict.json mãi không đổi" đã được sửa.
+
+6.6. LUỒNG "HỌC THẺ"
+
+  Mở deck -> StudyView -> Show Answer -> xem nghĩa + định nghĩa/đồng nghĩa/ví dụ
+  -> chọn Again/Hard/Good/Easy -> review_card ghi lịch ôn vào SQLite -> thẻ tiếp
+  theo. Hết thẻ -> "Session complete!".
+
+
+================================================================================
+PHẦN 7 — CÁC LỖI ĐÃ SỬA (BUG LOG)
+================================================================================
+
+7.1. TỪ MỚI "MẤT SẠCH" KHI SERVICE WORKER NGỦ
+
+  Hiện tượng: bấm Lưu / tra từ nhưng không thấy từ mới trong từ điển.
+  Nguyên nhân: bản cũ có dòng `dictionaryData[text] = newEntry;` nhưng KHÔNG BAO
+  GIỜ ghi ra đâu cả. Biến trong RAM của service worker mất khi worker ngủ.
+  Cách sửa: ghi vào chrome.storage.local (saveToCache) + POST /add_dict.
+
+7.2. "olunteer e" — TEXT BỊ CẮT KÝ TỰ
+
+  Hiện tượng: bôi đen "volunteer editors" nhưng lưu thành "olunteer e".
+  Nguyên nhân: content.js cũ KHÔNG huỷ request cũ. Khi bôi đen liên tiếp, text
+  gửi đi tra không khớp đoạn đang chọn (do đọc selection muộn / race).
+  Cách sửa: bắt selection NGAY khi selectionchange; thêm lookupSeq để bỏ kết
+  quả của lần tra cũ về muộn (cả ở content.js lẫn background.js).
+
+7.3. HAI INSTANCE SharedDictionary LỆCH CACHE
+
+  Hiện tượng: POST /add_dict trả added=1 nhưng deck không tăng thẻ.
+  Nguyên nhân: main.py tạo shared_dict cho UI, còn ApiServer TỰ tạo instance
+  riêng -> add_entries ghi vào cache của server, nhưng sync_dict_into_app() đọc
+  cache của UI (vẫn cũ) -> added=0.
+  Cách sửa: ApiServer.__init__(..., dictionary=None) — tiêm instance dùng chung.
+
+7.4. POPUP KHÔNG TẮT ĐƯỢC (BẤM RA NGOÀI VẪN HIỆN LẠI)
+
+  Hiện tượng: bôi đen thì OK, nhưng bấm ra ngoài để bỏ chọn thì popup VẪN liên
+  tục hiện lại ở chỗ bôi đen.
+  Nguyên nhân: mouseup cũ dùng `(raw.trim() || lastSelection.text)` — nhiều
+  trang KHÔNG xoá selection khi bấm ra ngoài (bấm chuột phải / vùng trống), nên
+  `raw` rỗng nhưng `lastSelection.text` vẫn còn giá trị cũ -> mouseup tưởng là
+  bôi đen mới -> hiện lại popup ở rect cũ.
+  Cách sửa: dùng "con dấu" (stamp) tăng dần. So sánh currentStamp với
+  pendingStamp (lúc mousedown) và shownStamp (đã hiện). Cộng thêm 2 lớp cờ:
+  suppressResult (chặn popup của request đang bay) và hasPendingLookup (để Esc
+  hoạt động cả khi popup chưa hiện).
+  Kiểm chứng: mô phỏng chuỗi sự kiện chuột — 12/12 PASS.
+
+7.5. MẤT DỮ LIỆU PHONG PHÚ KHI LƯU THẺ
+
+  Hiện tượng: thẻ lưu từ extension không có định nghĩa/đồng nghĩa/ví dụ dù popup
+  đã tra được.
+  Nguyên nhân: content.js gửi SAVE_WORD chỉ với {word, ipa, meaning, group_id};
+  server.py save_word cũng BỎ QUA 3 trường này.
+  Cách sửa: cả 3 tầng — content.js gửi kèm; server.py gom vào `extra`;
+  card_manager.add_card(..., extra=None) ghi vào thẻ. Tham số extra tuỳ chọn để
+  tương thích ngược.
+
+7.6. dict.json MÃI KHÔNG ĐỔI (LỖI GẦN NHẤT — quan trọng)
+
+  Hiện tượng: tra từ -> nhập vào app -> app chạy và lưu -> tắt app -> dict.json
+  vẫn giữ nguyên như cũ, không thay đổi.
+  Nguyên nhân (2 lỗi chồng nhau):
+    (1) Không có cơ chế "sync sau". pushToSharedDict chỉ ghi dict.json khi app
+        ĐANG CHẠY lúc tra từ. Comment nói "khi app bật sẽ sync sau" nhưng thực
+        tế KHÔNG có hàm nào làm việc đó. SYNC_DICT chỉ chạy NGƯỢC LẠI.
+    (2) loadDictionary() đọc CHỈ file đóng gói (snapshot lúc cài), không đọc file
+        app ghi trên đĩa, rồi cache vĩnh viễn.
+  Cách sửa:
+    - background.js: thêm FLUSH_CACHE_TO_DICT (cache -> dict.json), tách
+      _readPackagedDict/_readDictFromApp, loadDictionary ưu tiên GET /dict, thêm
+      reloadDictionary.
+    - content.js: thêm flushCacheToDict() gọi khi phát hiện app online (3 thời
+      điểm) + khi content script nạp.
+    - Bỏ gate isSingleWord -> lưu cả cụm từ <= 25 ký tự.
+  Kiểm chứng:
+    - Python end-to-end (chạy server thật -> /add_dict -> tắt -> đọc đĩa):
+      dict.json VẪN GIỮ từ sau khi tắt app -> 7/7 PASS.
+    - Mô phỏng luồng (Node): 8/8 PASS.
+
+7.7. BÀI HỌC CHUNG
+
+  - Khi người dùng báo "dữ liệu sai", PHẢI phân tích giá trị sai đó trước khi
+    đoán nguyên nhân (giá trị "olunteer e" chỉ ra đúng cơ chế gây lỗi).
+  - Với API không chính thức (mảng positional), luôn dump raw response để xem
+    cấu trúc thật trước khi viết parser.
+  - Sau MỖI lần sửa file JS/Python phải chạy node --check / py_compile (đã từng
+    có SyntaxError do sửa Edit làm dính dòng).
+  - Bug "cờ trạng thái" trong content script phải xét cả trạng thái BẤT ĐỒNG BỘ
+    (request đang bay), test tuần tự đơn giản sẽ bỏ sót.
+  - Kiểm tra CẢ HAI CHIỀU của mọi cơ chế đồng bộ; phân biệt "file đóng gói trong
+    extension" vs "file trên đĩa app ghi".
+
+
+================================================================================
+PHẦN 8 — QUYẾT ĐỊNH THIẾT KẾ & ĐÁNH ĐỔI
+================================================================================
+
+8.1. Vì sao dùng HTTP bridge thay vì Native Messaging?
+    Native messaging mạnh hơn nhưng phức tạp: phải đăng ký host manifest, cài
+    ở registry, khó debug. HTTP cổng 5000 đơn giản, dễ hiểu, đủ cho đồ án, và
+    mọi thứ đều thấy được qua log.
+
+8.2. Vì sao dùng custom URL protocol thay vì tự chạy app?
+    Trình duyệt chặn chạy file trực tiếp. URL protocol là cơ chế CHÍNH THỐNG để
+    mở app desktop từ web, chỉ ghi HKCU nên không cần admin.
+
+8.3. Vì sao chỉ nghe 127.0.0.1?
+    An toàn: server chỉ phục vụ máy cục bộ, không lộ ra mạng ngoài.
+
+8.4. Vì sao UiBridge dùng queue + root.after?
+    Tkinter không thread-safe. Đây là mẫu chuẩn để marshal công việc từ thread
+    khác về main thread.
+
+8.5. Vì sao dict.json KHÔNG ghi đè từ đã có?
+    Tránh dữ liệu rác (Google đôi khi trả nghĩa kém) ghi đè nghĩa tốt đã lưu.
+    "Ưu tiên dữ liệu cũ" là quy tắc an toàn.
+
+8.6. Vì sao ghi file kiểu atomic?
+    dict.json là file dùng chung, nhiều request có thể ghi đồng thời. Ghi ra
+    .tmp rồi replace đảm bảo file không bao giờ ở trạng thái nửa vời.
+
+8.7. Vì sao chỉ 1 request tới Google?
+    Ban đầu định gọi riêng endpoint đồng nghĩa, nhưng endpoint đó ĐÃ CHẾT. Phát
+    hiện ra đồng nghĩa nằm ngay trong response en->vi (data[1][i][2][j][1]) vốn
+    đã phải gọi -> vừa chính xác hơn vừa bớt 1 request.
+
+8.8. Vì sao lưu cả cụm từ <= 25 ký tự?
+    Cụm 2-3 từ như "volunteer editors" là từ vựng hợp lệ. Chỉ CÂU DÀI mới bị bỏ
+    (lưu câu vào từ điển là vô nghĩa).
+
+8.9. Vì sao answer gộp "ipa\nmeaning"?
+    Giữ tương thích ngược với mọi màn hình cũ (DeckView/Browse/Study chỉ đọc
+    `answer`), đồng thời StudyView có logic tách IPA ra hiển thị riêng.
+
+
+================================================================================
+PHẦN 9 — HƯỚNG DẪN CHẠY & KIỂM THỬ
+================================================================================
+
+9.1. CÀI ĐẶT (MỘT LẦN)
+
+  1. Cài protocol: nhấp đúp install_protocol.bat (hoặc chạy
+     python install_protocol.py). Kết quả: flashcard:// đã đăng ký.
+  2. Nạp extension: mở chrome://extensions -> bật Developer mode -> Load
+     unpacked -> chọn thư mục Browser_Extension.
+
+9.2. CHẠY HẰNG NGÀY
+
+  - Cách 1: chạy Flash_Card_App/run_app.bat (hoặc python main.py trong thư mục
+    Flash_Card_App).
+  - Cách 2: bấm "Mở Flashcard App" trên popup extension.
+
+9.3. DÙNG
+
+  1. Bôi đen từ trên bất kỳ trang web -> popup hiện nghĩa.
+  2. Chọn/tạo nhóm -> bấm "Lưu vào Flashcard".
+  3. Trong app: xem trong Decks / Browse; mở deck để học.
+
+9.4. KIỂM THỬ ĐÃ THỰC HIỆN
+
+  - Parser Google (Node, response thật happy/beautiful/journey/recovery/quickly):
+    40/40 PASS — IPA dạng /.../, meaning gắn nhãn từ loại, có định nghĩa/đồng
+    nghĩa/ví dụ, ví dụ đã sạch HTML.
+  - Mô phỏng chuỗi sự kiện chuột (fix popup không tắt): 12/12 PASS.
+  - save_word end-to-end (app thật): lưu đủ definitions/synonyms/examples + ipa;
+    payload cũ vẫn chạy -> TẤT CẢ PASS.
+  - Đồng bộ dict hai chiều: Python end-to-end 7/7 PASS (dict.json giữ từ sau khi
+    tắt app); mô phỏng luồng Node 8/8 PASS.
+
+9.5. LƯU Ý MÔI TRƯỜNG
+
+  - Cổng 5000 phải khớp giữa server.py và background.js (API_BASE/BRIDGE_PORT).
+  - Cổng bị chiếm -> app vẫn chạy, chỉ extension không kết nối được.
+  - Python managed của một số môi trường THIẾU tkinter -> phải dùng Python có
+    tkinter (bản cài đầy đủ) để chạy app.
+  - Sau khi sửa code extension, phải RELOAD extension trong chrome://extensions.
+  - Muốn từ tra lúc app tắt vào dict.json: chỉ cần MỞ APP LÊN (hoặc tải lại
+    trang) — extension tự đẩy, không cần thao tác gì thêm.
+
+
+================================================================================
+PHẦN 10 — HẠN CHẾ & HƯỚNG PHÁT TRIỂN
+================================================================================
+
+10.1. HẠN CHẾ HIỆN TẠI
+
+  - Google Translate là API KHÔNG CHÍNH THỨC -> có thể bị chặn/đổi cấu trúc bất
+    kỳ lúc nào. Parser đã phòng thủ nhưng vẫn phụ thuộc bên ngoài.
+  - Cổng 5000 hard-code ở hai nơi (server.py, background.js) — đổi phải sửa cả
+    hai.
+  - Tiến độ học dùng "question" làm khoá -> hai thẻ cùng từ ở hai deck khác nhau
+    chia sẻ tiến độ.
+  - ID deck/thẻ tính bằng max+1 -> có thể tái sử dụng ID sau khi xoá.
+  - Các cột thống kê New/Learn/Due trong DeckView chưa tính thật (đang là giá
+    trị tĩnh); nút Stats/Sync trong MainWindow là blank_action.
+  - Database.get_progress() đang là dead code (truy vấn cột id không tồn tại).
+  - Chưa đồng bộ với app khi app đang chạy liên tục theo thời gian thực (chỉ
+    đồng bộ khi có thao tác: lưu từ, mở app, nạp trang).
+
+10.2. HƯỚNG PHÁT TRIỂN
+
+  - Tính toán thật các cột New/Learn/Due dựa trên tiến độ trong SQLite.
+  - Thêm màn hình Stats (biểu đồ tiến độ học).
+  - Cho phép sửa/xoá thẻ từ Browse.
+  - Hỗ trợ nhiều ngôn ngữ đích (hiện cố định tl=vi).
+  - Cache offline đầy đủ hơn (hiện chỉ từ đã tra).
+  - Đóng gói app thành .exe (PyInstaller) để không cần cài Python.
+  - Thay Google Translate bằng API chính thức nếu cần độ ổn định cao.
+  - Thêm xác thực/giới hạn cho bridge nếu muốn nghe cả mạng LAN.
+
+
+================================================================================
+KẾT LUẬN
+================================================================================
+
+Dự án là một hệ thống hai phần (Browser Extension + Desktop App) liên thông qua
+HTTP bridge và custom URL protocol, dùng chung một từ điển tự lớn dần
+(dict.json). Kiến trúc phân tầng rõ ràng (data / logic / ui / server), server
+tái sử dụng logic của app (không có dữ liệu hai nơi), và nhiều bài học kỹ thuật
+thực tế đã được xử lý: chống race condition, thread-safety Tkinter, phòng thủ
+khi bóc tách API không chính thức, ghi file atomic, đồng bộ hai chiều, và các
+tinh chỉnh UX cho popup bôi đen.
+
+Tài liệu này mô tả đúng trạng thái mã nguồn hiện tại (sau khi đã sửa lỗi
+đồng bộ dict.json).
+
+================================================================================
+                                HẾT
+================================================================================

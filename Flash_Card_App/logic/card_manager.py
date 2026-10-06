@@ -10,7 +10,7 @@ class CardManager:
         return deck.get("cards", []) if deck else []
 
     
-    def add_card(self, deck_id, question, answer):
+    def add_card(self, deck_id, question, answer, extra=None):
         deck = self.repo.get_deck(deck_id)
 
         if not deck:
@@ -21,6 +21,14 @@ class CardManager:
             "question": question,
             "answer": answer
         }
+
+        # Dữ liệu phong phú (định nghĩa / đồng nghĩa / ví dụ) - chỉ ghi khi có,
+        # nhờ vậy file deck cũ không bị thêm khoá rỗng.
+        if isinstance(extra, dict):
+            for key in ("ipa", "definitions", "synonyms", "examples"):
+                value = extra.get(key)
+                if value:
+                    card[key] = value
 
         deck.setdefault("cards", []).append(card)
 

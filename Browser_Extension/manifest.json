@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Offline Dictionary",
-  "version": "1.0",
-  "description": "Bôi đen dịch tại chỗ Offline",
+  "version": "1.1",
+  "description": "Bôi đen dịch tại chỗ Offline + lưu từ vựng vào Flashcard App",
   "permissions": [
     "storage"
   ],
