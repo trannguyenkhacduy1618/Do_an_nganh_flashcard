@@ -108,7 +108,8 @@ class MainWindow:
         self.current_view = DeckView(
             self.content,
             self.deck_manager,
-            self.open_deck
+            self.database,
+            self.open_deck,
         )
         self.current_view.pack(fill=tk.BOTH, expand=True)
 
