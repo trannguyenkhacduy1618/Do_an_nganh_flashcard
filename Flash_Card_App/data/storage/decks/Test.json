@@ -33,11 +33,6 @@
             "answer": "Xấu đi \n Suy giảm \n Trở nên tồi tệ hơn"
         },
         {
-            "id": 8,
-            "question": "Eliminate",
-            "answer": "Loại bỏ \nXóa bỏ \nKhử"
-        },
-        {
             "id": 9,
             "question": "Enhance",
             "answer": "Nâng cao \n Tăng cường \n Cải thiện"
@@ -56,11 +51,6 @@
             "id": 12,
             "question": "Prohibit",
             "answer": "Cấm \n Ngăn cấm \n Không cho phép"
-        },
-        {
-            "id": 13,
-            "question": "Reluctant",
-            "answer": "Miễn cưỡng \n Không muốn \n Do dự"
         },
         {
             "id": 14,
