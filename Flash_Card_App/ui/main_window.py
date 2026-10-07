@@ -38,6 +38,7 @@ class MainWindow:
         self.nav_buttons = {}
         for name, command in [
             ("Decks", self.show_decks),
+            ("Add Card", self.show_add),
             ("Manage Decks", self.open_manage_window),
             ("Browse", self.show_browse),
             ("Stats", self.blank_action),
