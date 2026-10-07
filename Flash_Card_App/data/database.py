@@ -74,3 +74,13 @@ class Database:
                 """,
                 (question,)
             )
+    def edit_card_question(self, old_question, new_question):
+        with self.connect() as conn:
+            conn.execute(
+                """
+                UPDATE card_progress
+                SET question = ?
+                WHERE question = ?
+                """,
+                (new_question, old_question)
+            )

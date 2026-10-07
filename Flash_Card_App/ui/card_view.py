@@ -691,6 +691,10 @@ class CardView(tk.Frame):
 
                 card["question"] = new_question
                 card["answer"] = new_answer
+                self.database.edit_card_question(
+                    selected_card["question"],
+                    new_question
+                )
 
                 break
 

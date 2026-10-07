@@ -85,12 +85,12 @@ class MainWindow:
             padx=16, pady=7
         ).pack(side=tk.LEFT, padx=(245, 8), pady=12)
 
-        tk.Button(
-            bottom, text="Create Deck",
-            command=self.create_deck,
-            font=("Segoe UI", 10),
-            padx=16, pady=7
-        ).pack(side=tk.LEFT, padx=8, pady=12)
+        #tk.Button(
+            #bottom, text="Create Deck",
+           # command=self.create_deck,
+          #  font=("Segoe UI", 10),
+         #   padx=16, pady=7
+        #).pack(side=tk.LEFT, padx=8, pady=12)
 
         tk.Button(
             bottom, text="Import File",
