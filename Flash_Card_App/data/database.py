@@ -65,3 +65,12 @@ class Database:
             }
 
         return progress
+    def delete_progress(self, question):
+        with self.connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM card_progress
+                WHERE question = ?
+                """,
+                (question,)
+            )

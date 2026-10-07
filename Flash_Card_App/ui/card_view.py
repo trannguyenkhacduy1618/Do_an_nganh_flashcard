@@ -1,6 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
-
+from tkinter import ttk,messagebox
 from ui.theme import *
 
 
@@ -10,7 +9,8 @@ class CardView(tk.Frame):
         self,
         parent,
         deck_manager,
-        database
+        database,
+        card_manager
     ):
         super().__init__(
             parent,
@@ -19,15 +19,18 @@ class CardView(tk.Frame):
 
         self.deck_manager = deck_manager
         self.database = database
+        self.card_manager = card_manager
 
-        # All cards loaded from JSON
         self.all_cards = []
-
-        # Currently selected card
         self.selected_card = None
 
         self.build_ui()
         self.load_cards()
+
+        self.bind_all(
+            "<Control-Delete>",
+            self.delete_selected_card
+        )
 
     # =========================================================
     # UI
@@ -306,7 +309,7 @@ class CardView(tk.Frame):
         # RIGHT PANEL
         # Fixed width
         # =====================================================
-
+        # RIGHT PANEL
         self.right_panel = tk.Frame(
             main,
             bg=WHITE,
@@ -321,93 +324,107 @@ class CardView(tk.Frame):
             sticky="ns"
         )
 
-        # Prevent word/definition from changing panel width
         self.right_panel.grid_propagate(False)
 
-        # =====================================================
-        # WORD
-        # =====================================================
+
+        # -----------------------------
+        # Word
+        # -----------------------------
 
         tk.Label(
             self.right_panel,
             text="Word",
             bg=WHITE,
             fg=SECONDARY,
-            font=("Segoe UI", 12)
+            font=("Segoe UI", 9)
         ).pack(
             anchor="w",
             padx=20,
-            pady=(25, 5)
+            pady=(20, 5)
         )
 
-        self.word_label = tk.Label(
+
+        self.word_text = tk.Text(
             self.right_panel,
-            text="",
+            height=3,
+            width=30,
+            wrap=tk.WORD,
+            font=("Segoe UI", 16, "bold"),
             bg=WHITE,
             fg=TEXT,
-            font=("Segoe UI", 18, "bold"),
-
-            # Fixed width wrapping
-            width=28,
-
-            wraplength=250,
-            justify="left",
-            anchor="nw"
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            padx=8,
+            pady=8
         )
 
-        self.word_label.pack(
-            anchor="nw",
-            padx=20,
-            pady=(0, 25)
-        )
-
-        # =====================================================
-        # Separator
-        # =====================================================
-
-        tk.Frame(
-            self.right_panel,
-            bg=BORDER,
-            height=1
-        ).pack(
+        self.word_text.pack(
             fill=tk.X,
             padx=20
         )
 
-        # =====================================================
-        # DEFINITION
-        # =====================================================
+
+        # -----------------------------
+        # Definition
+        # -----------------------------
 
         tk.Label(
             self.right_panel,
             text="Definition",
             bg=WHITE,
             fg=SECONDARY,
-            font=("Segoe UI", 15, "bold")
+            font=("Segoe UI", 9)
         ).pack(
             anchor="w",
             padx=20,
-            pady=(25, 5)
+            pady=(20, 5)
         )
 
-        self.definition_label = tk.Label(
+
+        self.definition_text = tk.Text(
             self.right_panel,
-            text="",
+            height=12,
+            width=30,
+            wrap=tk.WORD,
+            font=("Segoe UI", 12),
             bg=WHITE,
             fg=TEXT,
-            font=("Segoe UI", 12),
-
-            # Fixed width
-            width=32,
-
-            wraplength=250,
-            justify="left",
-            anchor="nw"
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=BORDER,
+            padx=8,
+            pady=8
         )
 
-        self.definition_label.pack(
-            anchor="nw",
+        self.definition_text.pack(
+            fill=tk.BOTH,
+            expand=True,
             padx=20
+        )
+
+
+        # Enter = save
+        self.word_text.bind(
+            "<Return>",
+            self.save_card_changes
+        )
+
+        self.definition_text.bind(
+            "<Return>",
+            self.save_card_changes
+        )
+
+
+        # Ctrl + Delete = delete card
+        self.word_text.bind(
+            "<Control-Delete>",
+            self.delete_selected_card
+        )
+
+        self.definition_text.bind(
+            "<Control-Delete>",
+            self.delete_selected_card
         )
 
     # =========================================================
@@ -567,24 +584,38 @@ class CardView(tk.Frame):
 
     def show_card_details(self, card):
 
-        self.word_label.config(
-            text=card["question"]
+        self.word_text.delete(
+            "1.0",
+            tk.END
         )
 
-        self.definition_label.config(
-            text=card["answer"]
+        self.word_text.insert(
+            "1.0",
+            card["question"]
         )
 
+
+        self.definition_text.delete(
+            "1.0",
+            tk.END
+        )
+
+        self.definition_text.insert(
+            "1.0",
+            card["answer"]
+        )
     def clear_card_details(self):
 
         self.selected_card = None
 
-        self.word_label.config(
-            text=""
+        self.word_text.delete(
+            "1.0",
+            tk.END
         )
 
-        self.definition_label.config(
-            text=""
+        self.definition_text.delete(
+            "1.0",
+            tk.END
         )
 
     # =========================================================
@@ -620,3 +651,108 @@ class CardView(tk.Frame):
                 return card
 
         return None
+    def save_card_changes(self, event=None):
+
+        if not self.selected_card:
+            return "break"
+
+        # Keep reference before refreshing
+        selected_card = self.selected_card
+
+        new_question = self.word_text.get(
+            "1.0",
+            "end-1c"
+        ).strip()
+
+        new_answer = self.definition_text.get(
+            "1.0",
+            "end-1c"
+        ).strip()
+
+        if not new_question:
+            messagebox.showwarning(
+                "Invalid Card",
+                "Word cannot be empty.",
+                parent=self
+            )
+            return "break"
+
+        # Update JSON
+        deck = self.deck_manager.repo.get_deck(
+            selected_card["deck_id"]
+        )
+
+        if not deck:
+            return "break"
+
+        for card in deck.get("cards", []):
+
+            if card["id"] == selected_card["id"]:
+
+                card["question"] = new_question
+                card["answer"] = new_answer
+
+                break
+
+        self.deck_manager.repo.update_deck(deck)
+
+        # Update local card
+        selected_card["question"] = new_question
+        selected_card["answer"] = new_answer
+
+        # Remember its tree ID BEFORE refresh
+        tree_id = self.make_tree_id(
+            selected_card
+        )
+
+        # Refresh list
+        self.load_cards()
+
+        # Restore selected card
+        if self.card_tree.exists(tree_id):
+
+            self.card_tree.selection_set(
+                tree_id
+            )
+
+            self.card_tree.focus(
+                tree_id
+            )
+
+            self.selected_card = (
+                self.find_card_by_tree_id(
+                    tree_id
+                )
+            )
+
+        return "break"
+    def delete_selected_card(self, event=None):
+
+        if not self.selected_card:
+            return "break"
+
+        card = self.selected_card
+
+        confirm = messagebox.askyesno(
+            "Delete Card",
+            f"Delete '{card['question']}'?\n\n"
+            "This cannot be undone.",
+            parent=self
+        )
+
+        if not confirm:
+            return "break"
+
+        success = self.card_manager.delete_card(
+            card["deck_id"],
+            card["id"]
+        )
+
+        if success:
+            self.selected_card = None
+            self.load_cards()
+
+        return "break"
+
+
+    

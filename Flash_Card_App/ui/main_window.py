@@ -164,13 +164,16 @@ class MainWindow:
 
     #newly added
     def show_browse(self):
+
         self.clear_content()
 
         self.current_view = CardView(
             self.content,
             self.deck_manager,
-            self.database
+            self.database,
+            self.card_manager
         )
+
         self.current_view.pack(
             fill=tk.BOTH,
             expand=True
