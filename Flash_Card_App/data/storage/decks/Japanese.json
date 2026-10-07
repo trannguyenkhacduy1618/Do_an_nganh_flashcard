@@ -3,16 +3,6 @@
     "name": "Japanese",
     "cards": [
         {
-            "id": 1,
-            "question": "123",
-            "answer": "123"
-        },
-        {
-            "id": 2,
-            "question": "123124122",
-            "answer": "123141212412321"
-        },
-        {
             "id": 3,
             "question": "犯人",
             "answer": "(はんにん) Criminal / culprit."
