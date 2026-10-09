@@ -9,10 +9,11 @@ class StudyView(tk.Frame):
     ):
         super().__init__(parent, bg=BG)
         self.deck = deck
-        self.cards = cards
+        self.cards = list(cards)
         self.card_manager = card_manager
         self.on_back = on_back
-        self.index = 0
+        self.card_index = 0
+        self.card_finished = 0
         self.answer_visible = False
 
         self._build()
@@ -109,27 +110,39 @@ class StudyView(tk.Frame):
 
         self.load_card()
 
+    def is_it_new_or_due_card(self, card):
+        progress = self.card_manager.db.get_progress(card["question"])
+        if not progress:
+            return True  # New card
+
+        day_to_review = progress["day_to_review"]
+        if not day_to_review:
+            return True  # No review date set, treat as new
+
+        today = date.today().isoformat()
+        return today >= day_to_review  # Due card if today is on or after the review date
     def load_card(self):
-        if not self.cards:
+        card = self.cards[self.card_index]
+        if not self.is_it_new_or_due_card(card):
+            self.card_index += 1
+            if self.card_index >= len(self.cards):
+                self._finished()
+            else:
+                self.load_card()
             return
 
-        if self.index >= len(self.cards):
-            self.index = 0
-
-        card = self.cards[self.index]
         self.question_label.config(text=card["question"])
-        self.answer_label.config(text="")
-        self.answer_visible = False
-
         self.answer_label.pack_forget()
-        self.answer_frame.pack_forget()
         self.show_button.pack(pady=20)
+        self.answer_frame.pack_forget()
+        self.answer_visible = False
+        
         self.progress.config(
-            text=f"Card {self.index + 1} / {len(self.cards)}"
+            text=f"Cards left : {len(self.cards) - self.card_index}"
         )
 
     def show_answer(self):
-        card = self.cards[self.index]
+        card = self.cards[self.card_index]
         self.answer_label.config(text=card["answer"])
         self.answer_label.pack(
             fill=tk.X, padx=30, pady=15
@@ -139,11 +152,15 @@ class StudyView(tk.Frame):
         self.answer_visible = True
 
     def answer(self, difficulty):
-        card = self.cards[self.index]
+        card = self.cards[self.card_index]
         self.card_manager.review_card(card, difficulty)
 
-        self.index += 1
-        if self.index >= len(self.cards):
+        if difficulty == 1:
+            self.cards.append(card)
+
+        self.card_index += 1
+
+        if self.card_index >= len(self.cards):
             self._finished()
         else:
             self.load_card()

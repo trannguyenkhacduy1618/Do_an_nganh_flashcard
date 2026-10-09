@@ -1,5 +1,5 @@
 import sqlite3
-
+from datetime import date
 class Database:
     def __init__(self, db_file):
         self.db_file = db_file
@@ -34,13 +34,13 @@ class Database:
                 day_to_review
             ))
 
-    def get_progress(self, card_id):
+    def get_progress(self, question):
         with self.connect() as conn:
             row = conn.execute("""
                 SELECT difficulty, day_to_review
                 FROM card_progress
-                WHERE id = ?
-            """, (card_id,)).fetchone()
+                WHERE question = ?
+            """, (question,)).fetchone()
 
         if not row:
             return None
@@ -48,7 +48,9 @@ class Database:
         return {
             "difficulty": row[0],
             "day_to_review": row[1]
-            }
+        }
+
+
     def get_all_progress(self):
         with self.connect() as conn:
             rows = conn.execute("""
@@ -84,3 +86,24 @@ class Database:
                 """,
                 (new_question, old_question)
             )
+
+    def get_new_or_due_cards(self):
+        today = date.today().isoformat()
+
+        with self.connect() as conn:
+            rows = conn.execute("""
+                SELECT question, difficulty, day_to_review
+                FROM card_progress
+                WHERE day_to_review IS NULL OR day_to_review <= ?
+            """, (today,)).fetchall()
+
+        cards = []
+
+        for row in rows:
+            cards.append({
+                "question": row[0],
+                "difficulty": row[1],
+                "day_to_review": row[2]
+            })
+
+        return cards

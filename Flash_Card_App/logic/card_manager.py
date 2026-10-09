@@ -41,8 +41,7 @@ class CardManager:
             4: 7
         }
 
-        days = intervals.get(difficulty, 1)
-
+        days = intervals.get(difficulty, 1)        
         review_date = (
             date.today() +
             timedelta(days=days)
