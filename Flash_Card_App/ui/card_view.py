@@ -1,6 +1,7 @@
 import tkinter as tk
-from tkinter import ttk,messagebox
+from tkinter import ttk,messagebox,simpledialog
 from ui.theme import *
+from datetime import date, datetime, timedelta
 
 
 class CardView(tk.Frame):
@@ -217,7 +218,8 @@ class CardView(tk.Frame):
             "Treeview.Heading",
             font=("Segoe UI", 10, "bold")  # column title font
         )
-        self.card_tree = ttk.Treeview(
+        self.card_tree = ttk.Treeview(  
+            
             self.middle_panel,
             columns=columns,
             show="headings",
@@ -303,6 +305,12 @@ class CardView(tk.Frame):
         self.card_tree.bind(
             "<<TreeviewSelect>>",
             self.on_card_selected
+        )
+
+        # Double-click the DUE column to schedule a review
+        self.card_tree.bind(
+            "<Double-1>",
+            self.on_due_double_click
         )
 
         # =====================================================
@@ -757,6 +765,51 @@ class CardView(tk.Frame):
             self.load_cards()
 
         return "break"
+    def on_due_double_click(self, event):
+        # Only respond when the DUE column is double-clicked.
+        column = self.card_tree.identify_column(event.x)
+        if column != "#2":
+            return
+
+        row_id = self.card_tree.identify_row(event.y)
+        if not row_id:
+            return
+
+        card = self.find_card_by_tree_id(row_id)
+        if not card:
+            return
+
+        days = simpledialog.askinteger(
+            "Schedule Review",
+            "How many days until the next review?\n(0 = today)",
+            parent=self,
+            minvalue=0
+        )
+
+        # User cancelled the dialog.
+        if days is None:
+            return
+
+        try:
+            review_date = self.card_manager.schedule_card(
+                card["question"],
+                days
+            )
+
+            self.load_cards()
+
+            messagebox.showinfo(
+                "Review Scheduled",
+                f"Next review: {review_date}",
+                parent=self
+            )
+
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Could not update review date:\n{e}",
+                parent=self
+            )
 
 
-    
+        

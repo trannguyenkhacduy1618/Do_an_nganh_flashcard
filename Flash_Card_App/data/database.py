@@ -107,3 +107,12 @@ class Database:
             })
 
         return cards
+    def set_review_date(self, question, day_to_review):
+        with self.connect() as conn:
+            conn.execute("""
+                INSERT INTO card_progress
+                    (question, difficulty, day_to_review)
+                VALUES (?, NULL, ?)
+                ON CONFLICT(question)
+                DO UPDATE SET day_to_review = excluded.day_to_review
+            """, (question, day_to_review))

@@ -76,3 +76,11 @@ class CardManager:
         self.db.delete_progress(card_id)
 
         return True
+
+    def schedule_card(self, question, days):
+        review_date = date.today() + timedelta(days=days)
+        self.db.set_review_date(
+            question,
+            review_date.isoformat()
+        )
+        return review_date.isoformat()
