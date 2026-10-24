@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 class Database:
     def __init__(self, db_file):
         self.db_file = db_file
@@ -10,12 +10,22 @@ class Database:
     def initialize(self):
         with self.connect() as conn:
             conn.execute("""
-                    CREATE TABLE IF NOT EXISTS card_progress (
+                CREATE TABLE IF NOT EXISTS card_progress (
                     question TEXT PRIMARY KEY,
                     difficulty INTEGER,
                     day_to_review TEXT
                 )
             """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS review_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    question TEXT NOT NULL,
+                    reviewed_at TEXT NOT NULL,
+                    difficulty INTEGER NOT NULL
+                )
+            """)
+
             conn.commit()
 
     def save_progress(self, question, difficulty, day_to_review):
@@ -116,3 +126,59 @@ class Database:
                 ON CONFLICT(question)
                 DO UPDATE SET day_to_review = excluded.day_to_review
             """, (question, day_to_review))
+    def record_review(self, question, difficulty):
+        with self.connect() as conn:
+            conn.execute("""
+                INSERT INTO review_history
+                    (question, reviewed_at, difficulty)
+                VALUES (?, ?, ?)
+            """, (
+                question,
+                datetime.now().isoformat(timespec="seconds"),
+                difficulty
+            ))
+
+    def get_review_counts(self, start_date, end_date):
+        with self.connect() as conn:
+            rows = conn.execute("""
+                SELECT DATE(reviewed_at), COUNT(*)
+                FROM review_history
+                WHERE DATE(reviewed_at) BETWEEN ? AND ?
+                GROUP BY DATE(reviewed_at)
+                ORDER BY DATE(reviewed_at)
+            """, (start_date, end_date)).fetchall()
+
+        return dict(rows)
+
+    def get_today_stats(self):
+        today = date.today().isoformat()
+
+        with self.connect() as conn:
+            row = conn.execute("""
+                SELECT COUNT(*), COUNT(DISTINCT question)
+                FROM review_history
+                WHERE DATE(reviewed_at) = ?
+            """, (today,)).fetchone()
+
+        return {
+            "reviews": row[0],
+            "unique_cards": row[1]
+        }
+
+    def get_studied_questions(self):
+        with self.connect() as conn:
+            rows = conn.execute("""
+                SELECT DISTINCT question FROM review_history
+            """).fetchall()
+
+        return {row[0] for row in rows}
+
+    def get_study_days(self, start_date, end_date):
+        with self.connect() as conn:
+            rows = conn.execute("""
+                SELECT DISTINCT DATE(reviewed_at)
+                FROM review_history
+                WHERE DATE(reviewed_at) BETWEEN ? AND ?
+            """, (start_date, end_date)).fetchall()
+
+        return {row[0] for row in rows}

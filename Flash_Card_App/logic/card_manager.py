@@ -52,6 +52,11 @@ class CardManager:
             difficulty,
             review_date.isoformat()
         )
+        
+        self.db.record_review(
+            card["question"],
+            difficulty
+        )
     def delete_card(self, deck_id, card_id):
         deck = self.repo.get_deck(deck_id)
 

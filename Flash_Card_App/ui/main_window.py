@@ -7,6 +7,7 @@ from ui.theme import *
 from ui.deck_view import DeckView
 from ui.add_view import AddView
 from ui.study_view import StudyView
+from ui.stats_view import StatsView
 
 class MainWindow:
     def __init__(self, root, deck_manager, card_manager,database):
@@ -41,7 +42,7 @@ class MainWindow:
             ("Add Card", self.show_add),
             ("Manage Decks", self.open_manage_window),
             ("Browse", self.show_browse),
-            ("Stats", self.blank_action),
+            ("Stats", self.show_stats),
             ("Sync", self.blank_action),
         ]:
             btn = tk.Button(
@@ -189,3 +190,12 @@ class MainWindow:
             self.deck_manager,
             self.show_decks
         )
+    def show_stats(self):
+        self.clear_content()
+
+        self.current_view = StatsView(
+            self.content,
+            self.deck_manager,
+            self.database
+        )
+        self.current_view.pack(fill=tk.BOTH, expand=True)
