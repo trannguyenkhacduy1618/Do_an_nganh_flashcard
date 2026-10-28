@@ -1,3 +1,41 @@
+import subprocess
+import sys
+from pathlib import Path
+from importlib.metadata import PackageNotFoundError, distribution
+
+
+def install_requirements():
+    requirements = Path(__file__).parent / "requirements.txt"
+
+    packages = {
+        "Flask": "flask",
+        "easyocr": "easyocr",
+        "opencv-python": "opencv_python",
+        "numpy": "numpy",
+        "Pillow": "pillow",
+    }
+
+    missing = []
+
+    for package, distribution_name in packages.items():
+        try:
+            distribution(distribution_name)
+        except PackageNotFoundError:
+            missing.append(package)
+
+    if missing:
+        subprocess.check_call([
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-r",
+            str(requirements)
+        ])
+
+
+install_requirements()
+
 import queue
 import urllib.request
 
@@ -10,10 +48,19 @@ from data.database import Database
 
 from logic.deck_manager import DeckManager
 from logic.card_manager import CardManager
-
+from mobile.server import start_mobile_server
 from config import DB_FILE, DECKS_DIR, DICT_FILE
 from server import ApiServer, SharedDictionary, BRIDGE_HOST, BRIDGE_PORT
+import os
+import threading
+from mobile.server import get_reader
 
+threading.Thread(
+    target=get_reader,
+    daemon=True
+).start()
+os.environ["PYTHONUTF8"] = "1"
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 class UiBridge:
     """Cho phép thread của HTTP server yêu cầu main thread cập nhật giao diện.
@@ -134,7 +181,14 @@ def main():
         dictionary=shared_dict,
     )
     server.start()
+    server.start()
 
+    # Mobile camera OCR server
+    start_mobile_server(
+        deck_manager,
+        host="0.0.0.0",
+        port=7909   
+    )
     def on_close():
         server.stop()
         root.destroy()

@@ -153,5 +153,29 @@
     "ipa": "/jəˈpan/",
     "meaning": "- đồ sơn mài Nhật (Danh từ)\n- đồ sứ Nhật (Danh từ)\n- sơn mài Nhật (Danh từ)\n- lụa Nhật (Danh từ)\n- sơn bằng sơn mài Nhật (Động từ)\n- sơn đen bóng (Động từ)",
     "synonyms": []
+  },
+  "released": {
+    "ipa": "",
+    "meaning": "- thoát ra (Tính từ)",
+    "definitions": [
+      {
+        "pos": "Động từ",
+        "definitions": [
+          "allow or enable to escape from confinement; set free.",
+          "allow (something) to move, act, or flow freely.",
+          "allow (information) to be generally available.",
+          "remit or discharge (a debt)."
+        ]
+      }
+    ],
+    "synonyms": [
+      "exhausted"
+    ],
+    "examples": [
+      "an official confirmed the prisoners would be released",
+      "she released his arm and pushed him aside",
+      "no details about the contents of the talks were released",
+      "the amounts which later become due are consequent on the debt that is being released"
+    ]
   }
 }

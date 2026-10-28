@@ -8,6 +8,7 @@ from ui.deck_view import DeckView
 from ui.add_view import AddView
 from ui.study_view import StudyView
 from ui.stats_view import StatsView
+from ui.ocr_view import OcrView
 
 class MainWindow:
     def __init__(self, root, deck_manager, card_manager,database):
@@ -43,7 +44,7 @@ class MainWindow:
             ("Manage Decks", self.open_manage_window),
             ("Browse", self.show_browse),
             ("Stats", self.show_stats),
-            ("Sync", self.blank_action),
+            ("Camera OCR", self.open_ocr),
         ]:
             btn = tk.Button(
                 nav,
@@ -199,3 +200,5 @@ class MainWindow:
             self.database
         )
         self.current_view.pack(fill=tk.BOTH, expand=True)
+    def open_ocr(self):
+        OcrView(self.root, self.deck_manager)
