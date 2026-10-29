@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Offline Dictionary",
+  "version": "1.0",
+  "description": "Bôi đen dịch tại chỗ Offline",
+  "permissions": ["storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

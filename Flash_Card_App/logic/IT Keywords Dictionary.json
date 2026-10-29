@@ -1,0 +1,407 @@
+{
+    "id": 2,
+    "name": "IT Keywords Dictionary",
+    "cards": [
+        {
+            "id": 1,
+            "source": "dict",
+            "name": "Algorithm",
+            "definition": "Một tập hợp các bước được dùng để giải quyết một vấn đề.",
+            "pronunciation": "",
+            "example": "",
+            "answer": "Một tập hợp các bước được dùng để giải quyết một vấn đề."
+        },
+        {
+            "id": 2,
+            "source": "dict",
+            "name": "Application",
+            "definition": "Một chương trình được thiết kế để thực hiện một nhiệm vụ cụ thể.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 3,
+            "source": "dict",
+            "name": "Array",
+            "definition": "Mảng lưu trữ nhiều giá trị trong một biến.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 4,
+            "source": "dict",
+            "name": "Authentication",
+            "definition": "Authentication verifies who a user is.\nXác thực dùng để kiểm tra danh tính của người dùng.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 5,
+            "source": "dict",
+            "name": "Authorization",
+            "definition": "Authorization determines what a user can access.\nPhân quyền xác định người dùng được phép truy cập những gì.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 6,
+            "source": "dict",
+            "name": "Backup",
+            "definition": "Always back up important files before updating the system.\nLuôn sao lưu các tệp quan trọng trước khi cập nhật hệ thống.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 7,
+            "source": "dict",
+            "name": "Bandwidth",
+            "definition": "Video calls require enough bandwidth for smooth communication.\nCuộc gọi video cần đủ băng thông để giao tiếp mượt mà.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 8,
+            "source": "dict",
+            "name": "Binary",
+            "definition": "Computers represent data using binary digits.\nMáy tính biểu diễn dữ liệu bằng các chữ số nhị phân.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 9,
+            "source": "dict",
+            "name": "Bug",
+            "definition": "The developer fixed a bug in the login page.\nLập trình viên đã sửa một lỗi trong trang đăng nhập.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 10,
+            "source": "dict",
+            "name": "Cache",
+            "definition": "The browser stores images in its cache to load pages faster.\nTrình duyệt lưu hình ảnh trong bộ nhớ đệm để tải trang nhanh hơn.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 11,
+            "source": "dict",
+            "name": "Cloud Computing",
+            "definition": "Cloud computing lets companies use servers over the internet.\nĐiện toán đám mây cho phép các công ty sử dụng máy chủ qua Internet.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 12,
+            "source": "dict",
+            "name": "Compiler",
+            "definition": "A compiler translates source code into another form of code.\nTrình biên dịch chuyển mã nguồn sang một dạng mã khác.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 13,
+            "source": "dict",
+            "name": "Database",
+            "definition": "The application saves customer records in a database.\nỨng dụng lưu hồ sơ khách hàng trong cơ sở dữ liệu.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 14,
+            "source": "dict",
+            "name": "Debug",
+            "definition": "We need to debug the program before releasing it.\nChúng ta cần gỡ lỗi chương trình trước khi phát hành.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 15,
+            "source": "dict",
+            "name": "Deployment",
+            "definition": "The team will deploy the new version tonight.\nNhóm sẽ triển khai phiên bản mới vào tối nay.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 16,
+            "source": "dict",
+            "name": "Encryption",
+            "definition": "Encryption protects sensitive information from unauthorized access.\nMã hóa bảo vệ thông tin nhạy cảm khỏi việc truy cập trái phép.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 17,
+            "source": "dict",
+            "name": "Firewall",
+            "definition": "A firewall can block suspicious network traffic.\nTường lửa có thể chặn lưu lượng mạng đáng ngờ.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 18,
+            "source": "dict",
+            "name": "Framework",
+            "definition": "This framework helps developers build web applications.\nFramework này giúp lập trình viên xây dựng ứng dụng web.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 19,
+            "source": "dict",
+            "name": "Function",
+            "definition": "This function returns the sum of two numbers.\nHàm này trả về tổng của hai số.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 20,
+            "source": "dict",
+            "name": "Git",
+            "definition": "We use Git to track changes in the source code.\nChúng tôi sử dụng Git để theo dõi các thay đổi trong mã nguồn.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 21,
+            "source": "dict",
+            "name": "Hardware",
+            "definition": "The computer needs better hardware to run this software.\nMáy tính cần phần cứng tốt hơn để chạy phần mềm này.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 22,
+            "source": "dict",
+            "name": "Interface",
+            "definition": "The interface allows two systems to exchange information.\nGiao diện cho phép hai hệ thống trao đổi thông tin.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 23,
+            "source": "dict",
+            "name": "IP Address",
+            "definition": "Every device on this network has an IP address.\nMỗi thiết bị trong mạng này đều có một địa chỉ IP.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 24,
+            "source": "dict",
+            "name": "Iteration",
+            "definition": "Each iteration improves the solution step by step.\nMỗi lần lặp cải thiện lời giải từng bước.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 25,
+            "source": "dict",
+            "name": "Latency",
+            "definition": "High latency makes online games feel slow.\nĐộ trễ cao khiến trò chơi trực tuyến có cảm giác chậm.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 26,
+            "source": "dict",
+            "name": "Library",
+            "definition": "The project uses a library to process images.\nDự án sử dụng một thư viện để xử lý hình ảnh.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 27,
+            "source": "dict",
+            "name": "Malware",
+            "definition": "The security software detected malware on the computer.\nPhần mềm bảo mật phát hiện phần mềm độc hại trên máy tính.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 28,
+            "source": "dict",
+            "name": "Memory",
+            "definition": "The application uses too much memory.\nỨng dụng sử dụng quá nhiều bộ nhớ.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 29,
+            "source": "dict",
+            "name": "Network",
+            "definition": "The devices communicate through a local network.\nCác thiết bị giao tiếp thông qua mạng nội bộ.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 30,
+            "source": "dict",
+            "name": "Operating System",
+            "definition": "The operating system manages the computer's resources.\nHệ điều hành quản lý tài nguyên của máy tính.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 31,
+            "source": "dict",
+            "name": "Open Source",
+            "definition": "This open-source project accepts contributions from developers.\nDự án mã nguồn mở này chấp nhận đóng góp từ các lập trình viên.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 32,
+            "source": "dict",
+            "name": "Packet",
+            "definition": "The router forwards each packet to its destination.\nBộ định tuyến chuyển tiếp từng gói tin đến đích.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 33,
+            "source": "dict",
+            "name": "Password",
+            "definition": "Use a strong password for your account.\nHãy sử dụng mật khẩu mạnh cho tài khoản của bạn.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 34,
+            "source": "dict",
+            "name": "Phishing",
+            "definition": "The email was a phishing attempt designed to steal passwords.\nEmail đó là một nỗ lực lừa đảo nhằm đánh cắp mật khẩu.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 35,
+            "source": "dict",
+            "name": "Protocol",
+            "definition": "HTTPS is a protocol used to secure web communication.\nHTTPS là giao thức được dùng để bảo mật giao tiếp trên web.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 36,
+            "source": "dict",
+            "name": "Query",
+            "definition": "The SQL query retrieves all active users.\nTruy vấn SQL lấy ra tất cả người dùng đang hoạt động.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 37,
+            "source": "dict",
+            "name": "RAM",
+            "definition": "Adding more RAM may help the computer run several apps at once.\nThêm RAM có thể giúp máy tính chạy nhiều ứng dụng cùng lúc.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 38,
+            "source": "dict",
+            "name": "Repository",
+            "definition": "Push your changes to the shared repository.\nHãy đẩy các thay đổi của bạn lên kho lưu trữ chung.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 39,
+            "source": "dict",
+            "name": "Router",
+            "definition": "The router connects the local network to the internet.\nBộ định tuyến kết nối mạng nội bộ với Internet.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 40,
+            "source": "dict",
+            "name": "Scalability",
+            "definition": "Scalability is important when the number of users grows.\nKhả năng mở rộng rất quan trọng khi số lượng người dùng tăng lên.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 41,
+            "source": "dict",
+            "name": "Server",
+            "definition": "The server processes requests from client applications.\nMáy chủ xử lý các yêu cầu từ ứng dụng máy khách.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 42,
+            "source": "dict",
+            "name": "Software",
+            "definition": "The software needs an update to fix security issues.\nPhần mềm cần được cập nhật để sửa các vấn đề bảo mật.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 43,
+            "source": "dict",
+            "name": "Source Code",
+            "definition": "The source code explains how the program is written.\nMã nguồn thể hiện cách chương trình được viết.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 44,
+            "source": "dict",
+            "name": "Syntax",
+            "definition": "A missing bracket can cause a syntax error.\nThiếu dấu ngoặc có thể gây ra lỗi cú pháp.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 45,
+            "source": "dict",
+            "name": "Thread",
+            "definition": "The application creates a new thread to handle the task.\nỨng dụng tạo một luồng mới để xử lý tác vụ.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 46,
+            "source": "dict",
+            "name": "Troubleshooting",
+            "definition": "Troubleshooting helps identify the cause of a technical problem.\nQuá trình khắc phục sự cố giúp xác định nguyên nhân của vấn đề kỹ thuật.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 47,
+            "source": "dict",
+            "name": "User Interface",
+            "definition": "A clear user interface makes the app easier to use.\nGiao diện người dùng rõ ràng giúp ứng dụng dễ sử dụng hơn.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 48,
+            "source": "dict",
+            "name": "Version Control",
+            "definition": "Version control lets the team review earlier changes.\nQuản lý phiên bản cho phép nhóm xem lại các thay đổi trước đó.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 49,
+            "source": "dict",
+            "name": "Virtual Machine",
+            "definition": "A virtual machine can run a separate operating system.\nMáy ảo có thể chạy một hệ điều hành riêng.",
+            "pronunciation": "",
+            "example": ""
+        },
+        {
+            "id": 50,
+            "source": "dict",
+            "name": "Vulnerability",
+            "definition": "The update fixes a vulnerability in the web server.\nBản cập nhật sửa một lỗ hổng bảo mật trong máy chủ web.",
+            "pronunciation": "",
+            "example": ""
+        }
+    ]
+}
