@@ -23,14 +23,9 @@ class CardManager:
         }
 
         deck.setdefault("cards", []).append(card)
-
         self.repo.update_deck(deck)
 
-        self.db.save_progress(
-            card["question"],
-            None,
-            None
-        )
+        self.db.save_progress(question, None, None)
 
         return card
     def review_card(self, card, difficulty):

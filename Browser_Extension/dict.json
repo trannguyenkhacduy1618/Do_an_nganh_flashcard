@@ -177,5 +177,29 @@
       "no details about the contents of the talks were released",
       "the amounts which later become due are consequent on the debt that is being released"
     ]
+  },
+  "camera": {
+    "ipa": "",
+    "meaning": "máy ảnh"
+  },
+  "card": {
+    "ipa": "",
+    "meaning": "thẻ, thiếp"
+  },
+  "help": {
+    "ipa": "",
+    "meaning": "giúp đỡ"
+  },
+  "do_an_nganh_flashcard": {
+    "ipa": "",
+    "meaning": "thẻ flashcard do_an_nganh"
+  },
+  "manage": {
+    "ipa": "",
+    "meaning": "quản lý"
+  },
+  "browse": {
+    "ipa": "",
+    "meaning": "duyệt"
   }
 }

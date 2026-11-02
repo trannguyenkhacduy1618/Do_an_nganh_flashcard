@@ -27,10 +27,7 @@
         margin: 0;
         background: var(--background);
         color: var(--text);
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
+        font-family: system-ui, sans-serif;
       }
 
       header {
@@ -105,7 +102,12 @@
         color: #2458b5;
       }
 
-      #status {
+      .add-button {
+        background: #198754;
+      }
+
+      #status,
+      #lookupStatus {
         margin: 12px 0;
         color: var(--secondary);
         font-size: 14px;
@@ -118,6 +120,12 @@
         border-radius: 10px;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+        line-height: 1.8;
+        user-select: text;
+      }
+
+      .recognized::selection {
+        background: #a8c7fa;
       }
 
       .card {
@@ -147,8 +155,33 @@
         font-size: 12px;
       }
 
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: white;
+        font-size: 15px;
+      }
+
       .hidden {
         display: none;
+      }
+
+      .definition-row {
+        margin: 12px 0;
+        line-height: 1.55;
+      }
+
+      .definition-row strong {
+        display: block;
+        margin-bottom: 4px;
       }
     </style>
   </head>
@@ -157,11 +190,23 @@
     <header>
       <h1>Flashcard Scanner</h1>
       <div class="subtitle">
-        Scan a word and find its definition in your decks.
+        Scan words and find their definitions in your decks.
       </div>
     </header>
 
     <main>
+      <!-- Target deck selector -->
+      <section class="panel">
+        <h2>Target Deck</h2>
+
+        <label for="targetDeck"> Add new words to: </label>
+
+        <select id="targetDeck">
+          <option value="">Loading decks...</option>
+        </select>
+      </section>
+
+      <!-- Camera -->
       <section class="panel">
         <h2>1. Capture a word</h2>
 
@@ -188,14 +233,32 @@
         <div id="status" role="status" aria-live="polite">Ready to scan.</div>
       </section>
 
+      <!-- OCR results -->
       <section id="resultsPanel" class="panel hidden">
         <h2>2. Search results</h2>
 
         <h3>Recognized text</h3>
+
+        <p class="meta">Highlight any single word to look up its definition.</p>
+
         <div id="recognizedText" class="recognized"></div>
 
         <h3 id="matchHeading">Matching cards</h3>
+
         <div id="matches"></div>
+      </section>
+
+      <!-- Dictionary lookup -->
+      <section id="dictionaryPanel" class="panel hidden">
+        <h2>3. Word definition</h2>
+
+        <div id="dictionaryContent"></div>
+
+        <div id="lookupStatus" role="status"></div>
+
+        <button id="addButton" class="button add-button hidden">
+          Add to Deck
+        </button>
       </section>
     </main>
 
@@ -205,13 +268,77 @@
       const scanButton = document.getElementById("scanButton");
       const preview = document.getElementById("preview");
       const placeholder = document.getElementById("placeholder");
+
       const status = document.getElementById("status");
+
       const resultsPanel = document.getElementById("resultsPanel");
       const recognizedText = document.getElementById("recognizedText");
       const matchHeading = document.getElementById("matchHeading");
       const matchesContainer = document.getElementById("matches");
 
+      const targetDeck = document.getElementById("targetDeck");
+
+      const dictionaryPanel = document.getElementById("dictionaryPanel");
+      const dictionaryContent = document.getElementById("dictionaryContent");
+      const lookupStatus = document.getElementById("lookupStatus");
+      const addButton = document.getElementById("addButton");
+
       let selectedFile = null;
+      let currentDefinition = null;
+      let currentLookupToken = 0;
+
+      // --------------------------------
+      // LOAD DECKS
+      // --------------------------------
+
+      async function loadDecks() {
+        targetDeck.replaceChildren();
+
+        try {
+          const response = await fetch("/api/decks");
+
+          const responseText = await response.text();
+
+          let decks;
+
+          try {
+            decks = JSON.parse(responseText);
+          } catch {
+            throw new Error(
+              `Server returned HTML or invalid JSON. HTTP ${response.status}: ` +
+                responseText.substring(0, 200),
+            );
+          }
+
+          if (!response.ok) {
+            throw new Error(decks.error || "Cannot load decks.");
+          }
+
+          if (!Array.isArray(decks)) {
+            throw new Error(decks.error || "Invalid deck response.");
+          }
+
+          if (decks.length === 0) {
+            targetDeck.add(new Option("No decks available", ""));
+            return;
+          }
+
+          decks.forEach((deck) => {
+            targetDeck.add(new Option(deck.name, deck.id));
+          });
+        } catch (error) {
+          targetDeck.add(new Option("Failed to load decks", ""));
+
+          console.error("Deck loading error:", error);
+          status.textContent = error.message;
+        }
+      }
+
+      loadDecks();
+
+      // --------------------------------
+      // CAMERA
+      // --------------------------------
 
       cameraButton.addEventListener("click", () => {
         imageInput.click();
@@ -228,13 +355,18 @@
         }
 
         selectedFile = file;
+
         preview.src = URL.createObjectURL(file);
         preview.style.display = "block";
+
         placeholder.style.display = "none";
 
-        // Automatically run OCR immediately after capture.
         await scanImage();
       });
+
+      // --------------------------------
+      // OCR
+      // --------------------------------
 
       async function scanImage() {
         if (!selectedFile) return;
@@ -244,8 +376,10 @@
 
         scanButton.disabled = true;
         cameraButton.disabled = true;
+
         status.textContent = "Recognizing text...";
         resultsPanel.classList.add("hidden");
+        dictionaryPanel.classList.add("hidden");
 
         try {
           const response = await fetch("/api/scan", {
@@ -259,16 +393,22 @@
             throw new Error(data.error || "OCR failed.");
           }
 
-          recognizedText.textContent = data.text || "No text detected.";
+          // Support either response format.
+          const text = data.text || (data.recognized_text || []).join("\n");
+
+          recognizedText.textContent = text || "No text detected.";
 
           matchesContainer.replaceChildren();
 
           const cards = data.matches || [];
+
           matchHeading.textContent = `Matching cards (${cards.length})`;
 
           if (cards.length === 0) {
             const message = document.createElement("p");
+
             message.textContent = data.message || "No matching cards found.";
+
             matchesContainer.appendChild(message);
           }
 
@@ -278,22 +418,24 @@
 
             const question = document.createElement("h3");
             question.className = "question";
-            question.textContent = card.question;
+            question.textContent = card.question || card.name || "";
 
             const answer = document.createElement("p");
             answer.className = "answer";
-            answer.textContent = card.answer || "No definition available.";
+            answer.textContent =
+              card.answer || card.definition || "No definition available.";
 
             const meta = document.createElement("div");
             meta.className = "meta";
-            meta.textContent = `Deck: ${card.deck}`;
+            meta.textContent = `Deck: ${card.deck || ""}`;
 
             item.append(question, answer, meta);
             matchesContainer.appendChild(item);
           }
 
           resultsPanel.classList.remove("hidden");
-          status.textContent = data.message || "Search complete.";
+          status.textContent =
+            "Search complete. Highlight a word to look it up.";
         } catch (error) {
           status.textContent = `Error: ${error.message}`;
         } finally {
@@ -303,6 +445,189 @@
       }
 
       scanButton.addEventListener("click", scanImage);
+
+      // --------------------------------
+      // SELECT WORD FROM OCR TEXT
+      // --------------------------------
+
+      recognizedText.addEventListener("mouseup", handleWordSelection);
+      recognizedText.addEventListener("touchend", () => {
+        setTimeout(handleWordSelection, 100);
+      });
+
+      async function handleWordSelection() {
+        const selection = window.getSelection();
+        const word = selection.toString().trim();
+
+        // Only allow one word.
+        if (!word || /\s/.test(word)) {
+          return;
+        }
+
+        // Remove punctuation around the selected word.
+        const cleanWord = word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
+
+        if (!cleanWord) return;
+
+        await lookupWord(cleanWord);
+      }
+
+      // --------------------------------
+      // DICTIONARY LOOKUP
+      // --------------------------------
+
+      async function lookupWord(word) {
+        const lookupToken = ++currentLookupToken;
+
+        currentDefinition = null;
+
+        dictionaryPanel.classList.remove("hidden");
+        dictionaryContent.replaceChildren();
+
+        lookupStatus.textContent = `Looking up "${word}"...`;
+
+        addButton.classList.add("hidden");
+        addButton.disabled = false;
+
+        try {
+          const response = await fetch(
+            `/api/lookup?word=${encodeURIComponent(word)}`,
+          );
+
+          const data = await response.json();
+
+          // Ignore old requests if another word was selected.
+          if (lookupToken !== currentLookupToken) return;
+
+          if (!response.ok) {
+            throw new Error(data.error || "Word not found.");
+          }
+
+          dictionaryContent.replaceChildren();
+
+          if (data.exists) {
+            const card = data.card;
+
+            dictionaryContent.append(
+              createElement("h3", card.question || card.name),
+              createDefinitionRow("Definition", card.answer || card.definition),
+              createDefinitionRow("Deck", card.deck || "Existing card"),
+            );
+
+            lookupStatus.textContent =
+              "This word already exists in your decks.";
+
+            addButton.classList.add("hidden");
+            return;
+          }
+
+          const definition = data.definition;
+          currentDefinition = definition;
+
+          dictionaryContent.append(
+            createElement("h3", definition.word),
+            createDefinitionRow(
+              "Vietnamese translation",
+              definition.translation,
+            ),
+          );
+
+          lookupStatus.textContent =
+            "Word not found in your decks. You can add it below.";
+
+          addButton.classList.remove("hidden");
+        } catch (error) {
+          if (lookupToken !== currentLookupToken) return;
+
+          lookupStatus.textContent = error.message;
+        }
+      }
+
+      // --------------------------------
+      // HELPER FUNCTIONS
+      // --------------------------------
+
+      function createElement(tag, text) {
+        const element = document.createElement(tag);
+        element.textContent = text || "Not available";
+        return element;
+      }
+
+      function createDefinitionRow(label, value) {
+        const container = document.createElement("div");
+        container.className = "definition-row";
+
+        const title = document.createElement("strong");
+        title.textContent = label;
+
+        const content = document.createElement("div");
+        content.textContent = value || "Not available";
+
+        container.append(title, content);
+
+        return container;
+      }
+
+      // --------------------------------
+      // ADD WORD TO SELECTED DECK
+      // --------------------------------
+
+      addButton.addEventListener("click", async () => {
+        const definition = currentDefinition;
+        const lookupToken = currentLookupToken;
+
+        if (!definition) return;
+
+        const deckId = targetDeck.value.trim();
+
+        if (!deckId) {
+          lookupStatus.textContent = "Please select a deck first.";
+          return;
+        }
+
+        addButton.disabled = true;
+        lookupStatus.textContent = `Adding "${definition.word}"...`;
+
+        try {
+          const response = await fetch("/api/add-card", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              deck_id: deckId,
+              word: definition.word,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || "Failed to add card.");
+          }
+
+          if (currentLookupToken !== lookupToken) return;
+
+          lookupStatus.textContent =
+            `Successfully added "${data.word}" to "${data.deck}".`;
+
+          if (currentDefinition === definition) {
+            currentDefinition = null;
+            addButton.classList.add("hidden");
+          }
+        } catch (error) {
+          if (currentLookupToken === lookupToken) {
+            lookupStatus.textContent = error.message;
+          }
+        } finally {
+          if (
+            currentLookupToken === lookupToken &&
+            currentDefinition === definition
+          ) {
+            addButton.disabled = false;
+          }
+        }
+      });
     </script>
   </body>
 </html>

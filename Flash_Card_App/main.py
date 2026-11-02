@@ -125,23 +125,21 @@ def main():
         ui_bridge.post(app.focus_window)
 
     server = ApiServer(
-        deck_manager,
-        card_manager,
-        on_change=on_external_change,
-        on_focus=on_external_focus,
-        # Dùng CHUNG instance với UI: nếu để server tự tạo instance riêng thì
-        # cache RAM của hai bên lệch nhau và từ mới thêm qua /add_dict sẽ không
-        # được nạp lại vào app.
-        dictionary=shared_dict,
+    deck_manager,
+    card_manager,
+    on_change=on_external_change,
+    on_focus=on_external_focus,
+    dictionary=shared_dict,
     )
-    server.start()
+
     server.start()
 
-    # Mobile camera OCR server
     start_mobile_server(
         deck_manager,
+        card_manager,
+        dictionary=shared_dict,
         host="0.0.0.0",
-        port=7909   
+        port=7909
     )
     def on_close():
         server.stop()

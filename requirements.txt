@@ -3,3 +3,4 @@ easyocr
 opencv-python
 numpy
 Pillow
+requests
