@@ -134,6 +134,20 @@
         border: 1px solid var(--border);
         border-radius: 12px;
         background: white;
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+
+      .card:hover {
+        border-color: #c5d0e0;
+        box-shadow: 0 2px 8px rgba(32, 37, 51, 0.06);
+      }
+
+      .card.expanded {
+        border-color: var(--primary);
+        box-shadow: 0 2px 12px rgba(57, 120, 232, 0.12);
       }
 
       .question {
@@ -153,6 +167,151 @@
         margin-top: 10px;
         color: var(--secondary);
         font-size: 12px;
+      }
+
+      .expand-hint {
+        margin-top: 10px;
+        color: var(--primary);
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      .card.expanded .expand-hint {
+        display: none;
+      }
+
+      .card-details {
+        display: none;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+      }
+
+      .card.expanded .card-details {
+        display: block;
+      }
+
+      .details-section {
+        margin-bottom: 14px;
+      }
+
+      .details-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .details-section h4 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: var(--secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+
+      .link-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .link-list li {
+        margin-bottom: 6px;
+      }
+
+      .link-list a {
+        color: var(--primary);
+        text-decoration: none;
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      .link-list a:hover {
+        text-decoration: underline;
+      }
+
+      .image-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .image-item {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .image-item img {
+        width: 100%;
+        max-height: 160px;
+        object-fit: contain;
+        border-radius: 8px;
+        background: #f0f2f5;
+        border: 1px solid var(--border);
+        cursor: zoom-in;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .image-item .image-title {
+        font-size: 12px;
+        color: var(--secondary);
+        line-height: 1.3;
+      }
+
+      /* Fullscreen image lightbox (mobile) */
+      .lightbox {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.92);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        padding-top: max(16px, env(safe-area-inset-top));
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .lightbox.open {
+        display: flex;
+      }
+
+      .lightbox-close {
+        position: absolute;
+        top: max(12px, env(safe-area-inset-top));
+        right: 12px;
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
+        font-size: 28px;
+        line-height: 1;
+        cursor: pointer;
+        z-index: 1001;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .lightbox-img {
+        max-width: 100%;
+        max-height: calc(100vh - 100px);
+        object-fit: contain;
+        border-radius: 8px;
+        touch-action: manipulation;
+      }
+
+      .lightbox-caption {
+        margin-top: 12px;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 14px;
+        text-align: center;
+        max-width: 90%;
+        line-height: 1.4;
       }
 
       label {
@@ -195,7 +354,6 @@
     </header>
 
     <main>
-      <!-- Target deck selector -->
       <section class="panel">
         <h2>Target Deck</h2>
 
@@ -206,7 +364,6 @@
         </select>
       </section>
 
-      <!-- Camera -->
       <section class="panel">
         <h2>1. Capture a word</h2>
 
@@ -233,7 +390,6 @@
         <div id="status" role="status" aria-live="polite">Ready to scan.</div>
       </section>
 
-      <!-- OCR results -->
       <section id="resultsPanel" class="panel hidden">
         <h2>2. Search results</h2>
 
@@ -248,7 +404,6 @@
         <div id="matches"></div>
       </section>
 
-      <!-- Dictionary lookup -->
       <section id="dictionaryPanel" class="panel hidden">
         <h2>3. Word definition</h2>
 
@@ -261,6 +416,26 @@
         </button>
       </section>
     </main>
+
+    <!-- Single fullscreen image lightbox -->
+    <div
+      id="lightbox"
+      class="lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+    >
+      <button
+        type="button"
+        id="lightboxClose"
+        class="lightbox-close"
+        aria-label="Close"
+      >
+        ×
+      </button>
+      <img id="lightboxImg" class="lightbox-img" alt="" />
+      <div id="lightboxCaption" class="lightbox-caption"></div>
+    </div>
 
     <script>
       const imageInput = document.getElementById("imageInput");
@@ -283,6 +458,11 @@
       const lookupStatus = document.getElementById("lookupStatus");
       const addButton = document.getElementById("addButton");
 
+      const lightbox = document.getElementById("lightbox");
+      const lightboxImg = document.getElementById("lightboxImg");
+      const lightboxCaption = document.getElementById("lightboxCaption");
+      const lightboxClose = document.getElementById("lightboxClose");
+
       let selectedFile = null;
       let currentDefinition = null;
       let currentLookupToken = 0;
@@ -296,7 +476,6 @@
 
         try {
           const response = await fetch("/api/decks");
-
           const responseText = await response.text();
 
           let decks;
@@ -328,7 +507,6 @@
           });
         } catch (error) {
           targetDeck.add(new Option("Failed to load decks", ""));
-
           console.error("Deck loading error:", error);
           status.textContent = error.message;
         }
@@ -358,7 +536,6 @@
 
         preview.src = URL.createObjectURL(file);
         preview.style.display = "block";
-
         placeholder.style.display = "none";
 
         await scanImage();
@@ -393,44 +570,22 @@
             throw new Error(data.error || "OCR failed.");
           }
 
-          // Support either response format.
           const text = data.text || (data.recognized_text || []).join("\n");
 
           recognizedText.textContent = text || "No text detected.";
-
           matchesContainer.replaceChildren();
 
           const cards = data.matches || [];
-
           matchHeading.textContent = `Matching cards (${cards.length})`;
 
           if (cards.length === 0) {
             const message = document.createElement("p");
-
             message.textContent = data.message || "No matching cards found.";
-
             matchesContainer.appendChild(message);
           }
 
           for (const card of cards) {
-            const item = document.createElement("article");
-            item.className = "card";
-
-            const question = document.createElement("h3");
-            question.className = "question";
-            question.textContent = card.question || card.name || "";
-
-            const answer = document.createElement("p");
-            answer.className = "answer";
-            answer.textContent =
-              card.answer || card.definition || "No definition available.";
-
-            const meta = document.createElement("div");
-            meta.className = "meta";
-            meta.textContent = `Deck: ${card.deck || ""}`;
-
-            item.append(question, answer, meta);
-            matchesContainer.appendChild(item);
+            matchesContainer.appendChild(createMatchCard(card));
           }
 
           resultsPanel.classList.remove("hidden");
@@ -447,6 +602,172 @@
       scanButton.addEventListener("click", scanImage);
 
       // --------------------------------
+      // IMAGE LIGHTBOX (mobile)
+      // --------------------------------
+
+      function openLightbox(url, title) {
+        lightboxImg.src = url;
+        lightboxImg.alt = title || "Expanded image";
+        lightboxCaption.textContent = title || "";
+        lightbox.classList.add("open");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeLightbox() {
+        lightbox.classList.remove("open");
+        lightboxImg.src = "";
+        lightboxCaption.textContent = "";
+        document.body.style.overflow = "";
+      }
+
+      lightboxClose.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeLightbox();
+      });
+
+      // Tap backdrop or the large image to close
+      lightbox.addEventListener("click", (e) => {
+        if (e.target === lightbox || e.target === lightboxImg) {
+          closeLightbox();
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && lightbox.classList.contains("open")) {
+          closeLightbox();
+        }
+      });
+
+      // --------------------------------
+      // CREATE EXPANDABLE MATCH CARD
+      // --------------------------------
+
+      function createMatchCard(card) {
+        const item = document.createElement("article");
+        item.className = "card";
+        item.setAttribute("role", "button");
+        item.setAttribute("tabindex", "0");
+        item.setAttribute("aria-expanded", "false");
+
+        const question = document.createElement("h3");
+        question.className = "question";
+        question.textContent = card.question || card.name || "";
+
+        const answer = document.createElement("p");
+        answer.className = "answer";
+        answer.textContent =
+          card.answer || card.definition || "No definition available.";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `Deck: ${card.deck || ""}`;
+
+        const links = Array.isArray(card.links) ? card.links : [];
+        const images = Array.isArray(card.images) ? card.images : [];
+        const hasExtras = links.length > 0 || images.length > 0;
+
+        item.append(question, answer, meta);
+
+        if (hasExtras) {
+          const hint = document.createElement("div");
+          hint.className = "expand-hint";
+          hint.textContent = "Tap to show links & images";
+          item.appendChild(hint);
+
+          const details = document.createElement("div");
+          details.className = "card-details";
+
+          if (links.length > 0) {
+            const linksSection = document.createElement("div");
+            linksSection.className = "details-section";
+
+            const linksTitle = document.createElement("h4");
+            linksTitle.textContent = "Links";
+
+            const list = document.createElement("ul");
+            list.className = "link-list";
+
+            for (const link of links) {
+              if (!link || !link.url) continue;
+
+              const li = document.createElement("li");
+              const a = document.createElement("a");
+              a.href = link.url;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              a.textContent = link.title || link.url;
+              a.addEventListener("click", (e) => e.stopPropagation());
+
+              li.appendChild(a);
+              list.appendChild(li);
+            }
+
+            linksSection.append(linksTitle, list);
+            details.appendChild(linksSection);
+          }
+
+          if (images.length > 0) {
+            const imagesSection = document.createElement("div");
+            imagesSection.className = "details-section";
+
+            const imagesTitle = document.createElement("h4");
+            imagesTitle.textContent = "Images";
+
+            const grid = document.createElement("div");
+            grid.className = "image-grid";
+
+            for (const image of images) {
+              if (!image || !image.url) continue;
+
+              const imageItem = document.createElement("div");
+              imageItem.className = "image-item";
+
+              const img = document.createElement("img");
+              img.src = image.url;
+              img.alt = image.title || "Card image";
+              img.loading = "lazy";
+
+              img.addEventListener("click", (e) => {
+                e.stopPropagation();
+                openLightbox(image.url, image.title || "");
+              });
+
+              imageItem.appendChild(img);
+
+              if (image.title) {
+                const title = document.createElement("div");
+                title.className = "image-title";
+                title.textContent = image.title;
+                imageItem.appendChild(title);
+              }
+
+              grid.appendChild(imageItem);
+            }
+
+            imagesSection.append(imagesTitle, grid);
+            details.appendChild(imagesSection);
+          }
+
+          item.appendChild(details);
+
+          const toggle = () => {
+            const isExpanded = item.classList.toggle("expanded");
+            item.setAttribute("aria-expanded", String(isExpanded));
+          };
+
+          item.addEventListener("click", toggle);
+          item.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggle();
+            }
+          });
+        }
+
+        return item;
+      }
+
+      // --------------------------------
       // SELECT WORD FROM OCR TEXT
       // --------------------------------
 
@@ -459,14 +780,9 @@
         const selection = window.getSelection();
         const word = selection.toString().trim();
 
-        // Only allow one word.
-        if (!word || /\s/.test(word)) {
-          return;
-        }
+        if (!word || /\s/.test(word)) return;
 
-        // Remove punctuation around the selected word.
         const cleanWord = word.replace(/^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$/g, "");
-
         if (!cleanWord) return;
 
         await lookupWord(cleanWord);
@@ -480,12 +796,9 @@
         const lookupToken = ++currentLookupToken;
 
         currentDefinition = null;
-
         dictionaryPanel.classList.remove("hidden");
         dictionaryContent.replaceChildren();
-
         lookupStatus.textContent = `Looking up "${word}"...`;
-
         addButton.classList.add("hidden");
         addButton.disabled = false;
 
@@ -493,10 +806,8 @@
           const response = await fetch(
             `/api/lookup?word=${encodeURIComponent(word)}`,
           );
-
           const data = await response.json();
 
-          // Ignore old requests if another word was selected.
           if (lookupToken !== currentLookupToken) return;
 
           if (!response.ok) {
@@ -507,16 +818,13 @@
 
           if (data.exists) {
             const card = data.card;
-
             dictionaryContent.append(
               createElement("h3", card.question || card.name),
               createDefinitionRow("Definition", card.answer || card.definition),
               createDefinitionRow("Deck", card.deck || "Existing card"),
             );
-
             lookupStatus.textContent =
               "This word already exists in your decks.";
-
             addButton.classList.add("hidden");
             return;
           }
@@ -534,17 +842,15 @@
 
           lookupStatus.textContent =
             "Word not found in your decks. You can add it below.";
-
           addButton.classList.remove("hidden");
         } catch (error) {
           if (lookupToken !== currentLookupToken) return;
-
           lookupStatus.textContent = error.message;
         }
       }
 
       // --------------------------------
-      // HELPER FUNCTIONS
+      // HELPERS
       // --------------------------------
 
       function createElement(tag, text) {
@@ -564,7 +870,6 @@
         content.textContent = value || "Not available";
 
         container.append(title, content);
-
         return container;
       }
 
@@ -591,9 +896,7 @@
         try {
           const response = await fetch("/api/add-card", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               deck_id: deckId,
               word: definition.word,
@@ -608,8 +911,7 @@
 
           if (currentLookupToken !== lookupToken) return;
 
-          lookupStatus.textContent =
-            `Successfully added "${data.word}" to "${data.deck}".`;
+          lookupStatus.textContent = `Successfully added "${data.word}" to "${data.deck}".`;
 
           if (currentDefinition === definition) {
             currentDefinition = null;

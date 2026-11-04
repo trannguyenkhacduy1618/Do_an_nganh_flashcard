@@ -201,5 +201,21 @@
   "browse": {
     "ipa": "",
     "meaning": "duyệt"
+  },
+  "quoc": {
+    "ipa": "",
+    "meaning": "Quốc"
+  },
+  "nam": {
+    "ipa": "",
+    "meaning": "Nam"
+  },
+  "hoc": {
+    "ipa": "",
+    "meaning": "hoc"
+  },
+  "cach": {
+    "ipa": "",
+    "meaning": "cach"
   }
 }

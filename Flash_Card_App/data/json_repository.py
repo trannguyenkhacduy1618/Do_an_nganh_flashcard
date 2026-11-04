@@ -119,7 +119,6 @@ class JsonRepository:
 
         return True
     def deck_exists(self, name):
-
         path = self._get_path(name)
 
         return path.exists()
