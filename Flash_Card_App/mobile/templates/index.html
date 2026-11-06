@@ -135,24 +135,81 @@
         border-radius: 16px;
         background: white;
         cursor: pointer;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
       }
-      .card.expanded { padding: 26px; }
-      .card-topline { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
-      .pronunciation { color:var(--secondary); font-size:15px; }
-      .part-of-speech { padding:4px 9px; border:1px solid var(--border); border-radius:7px; color:var(--secondary); font-size:13px; }
-      .card-content-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(220px,1fr); gap:20px; }
-      .card-column { min-width:0; }
-      .detail-value { line-height:1.7; font-size:15px; overflow-wrap:anywhere; }
-      .detail-list { margin:0; padding-left:22px; line-height:1.8; }
-      .example-box { padding:14px 16px; background:#f5f7fb; border-left:4px solid var(--primary); border-radius:8px; line-height:1.7; }
-      .example-translation { margin-top:7px; color:var(--secondary); }
-      .mistake-list { padding:12px 16px; background:#fff8ed; border-radius:9px; line-height:1.7; }
-      @media (max-width:600px) {
-        .card, .card.expanded { padding:18px; }
-        .card-content-grid { grid-template-columns:1fr; gap:4px; }
-        .image-grid { grid-template-columns:1fr; }
-        .image-item img { max-height:260px; }
+      .card.expanded {
+        padding: 26px;
+      }
+      .card-topline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .pronunciation {
+        color: var(--secondary);
+        font-size: 15px;
+      }
+      .part-of-speech {
+        padding: 4px 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--secondary);
+        font-size: 13px;
+      }
+      .card-content-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(220px, 1fr);
+        gap: 20px;
+      }
+      .card-column {
+        min-width: 0;
+      }
+      .detail-value {
+        line-height: 1.7;
+        font-size: 15px;
+        overflow-wrap: anywhere;
+      }
+      .detail-list {
+        margin: 0;
+        padding-left: 22px;
+        line-height: 1.8;
+      }
+      .example-box {
+        padding: 14px 16px;
+        background: #f5f7fb;
+        border-left: 4px solid var(--primary);
+        border-radius: 8px;
+        line-height: 1.7;
+      }
+      .example-translation {
+        margin-top: 7px;
+        color: var(--secondary);
+      }
+      .mistake-list {
+        padding: 12px 16px;
+        background: #fff8ed;
+        border-radius: 9px;
+        line-height: 1.7;
+      }
+      @media (max-width: 600px) {
+        .card,
+        .card.expanded {
+          padding: 18px;
+        }
+        .card-content-grid {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+        .image-grid {
+          grid-template-columns: 1fr;
+        }
+        .image-item img {
+          max-height: 260px;
+        }
       }
 
       .card:hover {
@@ -715,7 +772,6 @@
 
         const meta = document.createElement("div");
         meta.className = "meta";
-        meta.textContent = `Category: ${card.category || "General"} • Deck: ${card.deck || "Unknown"}`;
 
         const hint = document.createElement("div");
         hint.className = "expand-hint";
@@ -741,7 +797,8 @@
           const box = document.createElement("div");
           box.className = "example-box";
           const exampleText = document.createElement("div");
-          exampleText.textContent = card.example.text || "No example available.";
+          exampleText.textContent =
+            card.example.text || "No example available.";
           box.appendChild(exampleText);
           if (card.example.translation) {
             const translation = document.createElement("div");
