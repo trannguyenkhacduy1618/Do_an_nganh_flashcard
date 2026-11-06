@@ -129,15 +129,30 @@
       }
 
       .card {
-        padding: 15px;
-        margin-top: 12px;
+        padding: 22px;
+        margin-top: 18px;
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: 16px;
         background: white;
         cursor: pointer;
-        transition:
-          border-color 0.15s ease,
-          box-shadow 0.15s ease;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .card.expanded { padding: 26px; }
+      .card-topline { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+      .pronunciation { color:var(--secondary); font-size:15px; }
+      .part-of-speech { padding:4px 9px; border:1px solid var(--border); border-radius:7px; color:var(--secondary); font-size:13px; }
+      .card-content-grid { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(220px,1fr); gap:20px; }
+      .card-column { min-width:0; }
+      .detail-value { line-height:1.7; font-size:15px; overflow-wrap:anywhere; }
+      .detail-list { margin:0; padding-left:22px; line-height:1.8; }
+      .example-box { padding:14px 16px; background:#f5f7fb; border-left:4px solid var(--primary); border-radius:8px; line-height:1.7; }
+      .example-translation { margin-top:7px; color:var(--secondary); }
+      .mistake-list { padding:12px 16px; background:#fff8ed; border-radius:9px; line-height:1.7; }
+      @media (max-width:600px) {
+        .card, .card.expanded { padding:18px; }
+        .card-content-grid { grid-template-columns:1fr; gap:4px; }
+        .image-grid { grid-template-columns:1fr; }
+        .image-item img { max-height:260px; }
       }
 
       .card:hover {
@@ -649,121 +664,173 @@
         item.setAttribute("tabindex", "0");
         item.setAttribute("aria-expanded", "false");
 
+        const section = (parent, title, value) => {
+          if (value == null || value === "") return;
+          const wrap = document.createElement("section");
+          wrap.className = "details-section";
+          const heading = document.createElement("h4");
+          heading.textContent = title;
+          const body = document.createElement("div");
+          body.className = "detail-value";
+
+          if (Array.isArray(value)) {
+            const list = document.createElement("ul");
+            list.className = "detail-list";
+            value.forEach((entry) => {
+              const li = document.createElement("li");
+              li.textContent = entry;
+              list.appendChild(li);
+            });
+            body.appendChild(list);
+          } else {
+            body.textContent = value;
+          }
+          wrap.append(heading, body);
+          parent.appendChild(wrap);
+        };
+
+        const top = document.createElement("div");
+        top.className = "card-topline";
+        if (card.pronunciation) {
+          const ipa = document.createElement("span");
+          ipa.className = "pronunciation";
+          ipa.textContent = card.pronunciation;
+          top.appendChild(ipa);
+        }
+        if (card.part_of_speech) {
+          const pos = document.createElement("span");
+          pos.className = "part-of-speech";
+          pos.textContent = card.part_of_speech;
+          top.appendChild(pos);
+        }
+
         const question = document.createElement("h3");
         question.className = "question";
-        question.textContent = card.question || card.name || "";
+        question.textContent = card.question || card.name || "Untitled";
 
         const answer = document.createElement("p");
         answer.className = "answer";
-        answer.textContent =
-          card.answer || card.definition || "No definition available.";
+        answer.style.cssText = "font-size:18px;font-weight:650";
+        answer.textContent = card.answer || "No translation available.";
 
         const meta = document.createElement("div");
         meta.className = "meta";
-        meta.textContent = `Deck: ${card.deck || ""}`;
+        meta.textContent = `Category: ${card.category || "General"} • Deck: ${card.deck || "Unknown"}`;
 
-        const links = Array.isArray(card.links) ? card.links : [];
-        const images = Array.isArray(card.images) ? card.images : [];
-        const hasExtras = links.length > 0 || images.length > 0;
+        const hint = document.createElement("div");
+        hint.className = "expand-hint";
+        hint.textContent = "Tap to view full details";
+        item.append(top, question, answer, meta, hint);
 
-        item.append(question, answer, meta);
+        const details = document.createElement("div");
+        details.className = "card-details";
+        const grid = document.createElement("div");
+        grid.className = "card-content-grid";
+        const left = document.createElement("div");
+        left.className = "card-column";
+        const right = document.createElement("div");
+        right.className = "card-column";
 
-        if (hasExtras) {
-          const hint = document.createElement("div");
-          hint.className = "expand-hint";
-          hint.textContent = "Tap to show links & images";
-          item.appendChild(hint);
+        section(left, "Definition", card.definition);
 
-          const details = document.createElement("div");
-          details.className = "card-details";
-
-          if (links.length > 0) {
-            const linksSection = document.createElement("div");
-            linksSection.className = "details-section";
-
-            const linksTitle = document.createElement("h4");
-            linksTitle.textContent = "Links";
-
-            const list = document.createElement("ul");
-            list.className = "link-list";
-
-            for (const link of links) {
-              if (!link || !link.url) continue;
-
-              const li = document.createElement("li");
-              const a = document.createElement("a");
-              a.href = link.url;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              a.textContent = link.title || link.url;
-              a.addEventListener("click", (e) => e.stopPropagation());
-
-              li.appendChild(a);
-              list.appendChild(li);
-            }
-
-            linksSection.append(linksTitle, list);
-            details.appendChild(linksSection);
+        if (card.example && typeof card.example === "object") {
+          const wrap = document.createElement("section");
+          wrap.className = "details-section";
+          const heading = document.createElement("h4");
+          heading.textContent = "Example";
+          const box = document.createElement("div");
+          box.className = "example-box";
+          const exampleText = document.createElement("div");
+          exampleText.textContent = card.example.text || "No example available.";
+          box.appendChild(exampleText);
+          if (card.example.translation) {
+            const translation = document.createElement("div");
+            translation.className = "example-translation";
+            translation.textContent = card.example.translation;
+            box.appendChild(translation);
           }
-
-          if (images.length > 0) {
-            const imagesSection = document.createElement("div");
-            imagesSection.className = "details-section";
-
-            const imagesTitle = document.createElement("h4");
-            imagesTitle.textContent = "Images";
-
-            const grid = document.createElement("div");
-            grid.className = "image-grid";
-
-            for (const image of images) {
-              if (!image || !image.url) continue;
-
-              const imageItem = document.createElement("div");
-              imageItem.className = "image-item";
-
-              const img = document.createElement("img");
-              img.src = image.url;
-              img.alt = image.title || "Card image";
-              img.loading = "lazy";
-
-              img.addEventListener("click", (e) => {
-                e.stopPropagation();
-                openLightbox(image.url, image.title || "");
-              });
-
-              imageItem.appendChild(img);
-
-              if (image.title) {
-                const title = document.createElement("div");
-                title.className = "image-title";
-                title.textContent = image.title;
-                imageItem.appendChild(title);
-              }
-
-              grid.appendChild(imageItem);
-            }
-
-            imagesSection.append(imagesTitle, grid);
-            details.appendChild(imagesSection);
-          }
-
-          item.appendChild(details);
-
-          const toggle = () => {
-            const isExpanded = item.classList.toggle("expanded");
-            item.setAttribute("aria-expanded", String(isExpanded));
-          };
-
-          item.addEventListener("click", toggle);
-          item.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              toggle();
-            }
-          });
+          wrap.append(heading, box);
+          left.appendChild(wrap);
+        } else {
+          section(left, "Example", card.example);
         }
 
+        section(left, "How it works", card.how_it_works);
+        section(right, "Applications", card.applications);
+        section(right, "Related terms", card.related_terms);
+        section(right, "Common mistakes", card.common_mistakes);
+        grid.append(left, right);
+        details.appendChild(grid);
+
+        const images = Array.isArray(card.images) ? card.images : [];
+        if (images.length) {
+          const wrap = document.createElement("section");
+          wrap.className = "details-section";
+          const heading = document.createElement("h4");
+          heading.textContent = "Images";
+          const imageGrid = document.createElement("div");
+          imageGrid.className = "image-grid";
+          images.forEach((image) => {
+            if (!image || !image.url) return;
+            const imageItem = document.createElement("div");
+            imageItem.className = "image-item";
+            const img = document.createElement("img");
+            img.src = image.url;
+            img.alt = image.title || "Flashcard illustration";
+            img.loading = "lazy";
+            img.addEventListener("click", (e) => {
+              e.stopPropagation();
+              openLightbox(image.url, image.title || "");
+            });
+            imageItem.appendChild(img);
+            if (image.title) {
+              const title = document.createElement("div");
+              title.className = "image-title";
+              title.textContent = image.title;
+              imageItem.appendChild(title);
+            }
+            imageGrid.appendChild(imageItem);
+          });
+          wrap.append(heading, imageGrid);
+          details.appendChild(wrap);
+        }
+
+        const links = Array.isArray(card.links) ? card.links : [];
+        if (links.length) {
+          const wrap = document.createElement("section");
+          wrap.className = "details-section";
+          const heading = document.createElement("h4");
+          heading.textContent = "References & links";
+          const list = document.createElement("ul");
+          list.className = "link-list";
+          links.forEach((link) => {
+            if (!link || !link.url) return;
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = link.url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = link.title || link.url;
+            a.addEventListener("click", (e) => e.stopPropagation());
+            li.appendChild(a);
+            list.appendChild(li);
+          });
+          wrap.append(heading, list);
+          details.appendChild(wrap);
+        }
+
+        item.appendChild(details);
+        const toggle = () => {
+          const expanded = item.classList.toggle("expanded");
+          item.setAttribute("aria-expanded", String(expanded));
+        };
+        item.addEventListener("click", toggle);
+        item.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        });
         return item;
       }
 
