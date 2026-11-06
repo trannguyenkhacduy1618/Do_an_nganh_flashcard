@@ -772,6 +772,7 @@
 
         const meta = document.createElement("div");
         meta.className = "meta";
+        meta.textContent = `Deck: ${card.deck || "Unknown"}`;
 
         const hint = document.createElement("div");
         hint.className = "expand-hint";
