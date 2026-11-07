@@ -10,7 +10,22 @@ class CardManager:
         return deck.get("cards", []) if deck else []
 
     
-    def add_card(self, deck_id, question, answer):
+    def add_card(
+        self,
+        deck_id,
+        question,
+        answer,
+        pronunciation="",
+        part_of_speech="",
+        example_text="",
+        example_translation="",
+        how_it_works="",
+        applications=None,
+        related_terms=None,
+        common_mistakes=None,
+        image_urls=None,
+        link_urls=None
+    ):
         deck = self.repo.get_deck(deck_id)
 
         if not deck:
@@ -19,12 +34,31 @@ class CardManager:
         card = {
             "id": self.repo.next_card_id(deck),
             "question": question,
-            "answer": answer
+            "answer": answer,
+            "pronunciation": pronunciation,
+            "part_of_speech": part_of_speech,
+            "example": {
+                "text": example_text,
+                "translation": example_translation
+            },
+            "how_it_works": how_it_works,
+            "applications": applications or [],
+            "related_terms": related_terms or [],
+            "common_mistakes": common_mistakes or [],
+            "images": [
+                {
+                    "title": f"{question} - illustration {i}",
+                    "url": url
+                }
+                for i, url in enumerate(image_urls or [], start=1)
+            ],
+            "link_urls": link_urls or []
         }
 
         deck.setdefault("cards", []).append(card)
         self.repo.update_deck(deck)
 
+        # SQLite still uses the question as the progress key
         self.db.save_progress(question, None, None)
 
         return card
