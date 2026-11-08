@@ -141,14 +141,29 @@ def main():
         host="0.0.0.0",
         port=7909
     )
-    def on_close():
-        server.stop()
-        root.destroy()
+    def shutdown():
+        try:
+            server.stop()
+        except Exception:
+            pass
 
-    root.protocol("WM_DELETE_WINDOW", on_close)
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
 
-    root.mainloop()
+    root.protocol("WM_DELETE_WINDOW", shutdown)
+
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        shutdown()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass

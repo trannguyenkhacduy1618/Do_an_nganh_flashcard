@@ -102,10 +102,6 @@
         color: #2458b5;
       }
 
-      .add-button {
-        background: #198754;
-      }
-
       #status,
       #lookupStatus {
         margin: 12px 0;
@@ -126,6 +122,20 @@
 
       .recognized::selection {
         background: #a8c7fa;
+      }
+
+      .recognized .deck-word {
+        background: #fff0b3;
+        color: #765000;
+        border-radius: 4px;
+        padding: 1px 2px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: inset 0 -2px 0 #e6b638;
+      }
+
+      .recognized .deck-word:hover {
+        background: #ffe18a;
       }
 
       .card {
@@ -421,20 +431,11 @@
     <header>
       <h1>Flashcard Scanner</h1>
       <div class="subtitle">
-        Scan words and find their definitions in your decks.
+        Scan text and look up any highlighted word online.
       </div>
     </header>
 
     <main>
-      <section class="panel">
-        <h2>Target Deck</h2>
-
-        <label for="targetDeck"> Add new words to: </label>
-
-        <select id="targetDeck">
-          <option value="">Loading decks...</option>
-        </select>
-      </section>
 
       <section class="panel">
         <h2>1. Capture a word</h2>
@@ -467,7 +468,7 @@
 
         <h3>Recognized text</h3>
 
-        <p class="meta">Highlight any single word to look up its definition.</p>
+        <p class="meta">Highlight any single word to look up its full dictionary entry online.</p>
 
         <div id="recognizedText" class="recognized"></div>
 
@@ -477,15 +478,12 @@
       </section>
 
       <section id="dictionaryPanel" class="panel hidden">
-        <h2>3. Word definition</h2>
+        <h2>3. Dictionary result</h2>
 
         <div id="dictionaryContent"></div>
 
         <div id="lookupStatus" role="status"></div>
 
-        <button id="addButton" class="button add-button hidden">
-          Add to Deck
-        </button>
       </section>
     </main>
 
@@ -523,12 +521,9 @@
       const matchHeading = document.getElementById("matchHeading");
       const matchesContainer = document.getElementById("matches");
 
-      const targetDeck = document.getElementById("targetDeck");
-
       const dictionaryPanel = document.getElementById("dictionaryPanel");
       const dictionaryContent = document.getElementById("dictionaryContent");
       const lookupStatus = document.getElementById("lookupStatus");
-      const addButton = document.getElementById("addButton");
 
       const lightbox = document.getElementById("lightbox");
       const lightboxImg = document.getElementById("lightboxImg");
@@ -536,55 +531,7 @@
       const lightboxClose = document.getElementById("lightboxClose");
 
       let selectedFile = null;
-      let currentDefinition = null;
       let currentLookupToken = 0;
-
-      // --------------------------------
-      // LOAD DECKS
-      // --------------------------------
-
-      async function loadDecks() {
-        targetDeck.replaceChildren();
-
-        try {
-          const response = await fetch("/api/decks");
-          const responseText = await response.text();
-
-          let decks;
-
-          try {
-            decks = JSON.parse(responseText);
-          } catch {
-            throw new Error(
-              `Server returned HTML or invalid JSON. HTTP ${response.status}: ` +
-                responseText.substring(0, 200),
-            );
-          }
-
-          if (!response.ok) {
-            throw new Error(decks.error || "Cannot load decks.");
-          }
-
-          if (!Array.isArray(decks)) {
-            throw new Error(decks.error || "Invalid deck response.");
-          }
-
-          if (decks.length === 0) {
-            targetDeck.add(new Option("No decks available", ""));
-            return;
-          }
-
-          decks.forEach((deck) => {
-            targetDeck.add(new Option(deck.name, deck.id));
-          });
-        } catch (error) {
-          targetDeck.add(new Option("Failed to load decks", ""));
-          console.error("Deck loading error:", error);
-          status.textContent = error.message;
-        }
-      }
-
-      loadDecks();
 
       // --------------------------------
       // CAMERA
@@ -612,6 +559,50 @@
 
         await scanImage();
       });
+
+      // --------------------------------
+      // OCR TEXT HIGHLIGHTING
+      // --------------------------------
+
+      function normalizeWord(value) {
+        return String(value || "")
+          .toLocaleLowerCase()
+          .replace(/[^a-z0-9]/g, "");
+      }
+
+      function renderRecognizedText(text, cards, matchedWords = []) {
+        recognizedText.replaceChildren();
+
+        const deckWords = new Set(matchedWords.map(normalizeWord));
+        // Fallback for older backend responses without matched_words.
+        if (deckWords.size === 0) {
+          for (const card of cards) {
+            const question = card.question || card.name || "";
+            for (const part of String(question).split(/\s+/)) {
+              const normalized = normalizeWord(part);
+              if (normalized) deckWords.add(normalized);
+            }
+          }
+        }
+
+        // Keep punctuation and whitespace intact while wrapping matching words.
+        const parts = String(text || "No text detected.").split(
+          /([A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*)/g
+        );
+
+        for (const part of parts) {
+          const normalized = normalizeWord(part);
+          if (normalized && deckWords.has(normalized)) {
+            const mark = document.createElement("mark");
+            mark.className = "deck-word";
+            mark.title = "Từ này đã có trong deck";
+            mark.textContent = part;
+            recognizedText.appendChild(mark);
+          } else {
+            recognizedText.appendChild(document.createTextNode(part));
+          }
+        }
+      }
 
       // --------------------------------
       // OCR
@@ -644,10 +635,10 @@
 
           const text = data.text || (data.recognized_text || []).join("\n");
 
-          recognizedText.textContent = text || "No text detected.";
           matchesContainer.replaceChildren();
 
           const cards = data.matches || [];
+          renderRecognizedText(text, cards, data.matched_words || []);
           matchHeading.textContent = `Matching cards (${cards.length})`;
 
           if (cards.length === 0) {
@@ -788,13 +779,13 @@
         const right = document.createElement("div");
         right.className = "card-column";
 
-        section(left, "Definition", card.definition);
+        section(left, "Định nghĩa", card.definition);
 
         if (card.example && typeof card.example === "object") {
           const wrap = document.createElement("section");
           wrap.className = "details-section";
           const heading = document.createElement("h4");
-          heading.textContent = "Example";
+          heading.textContent = "Ví dụ";
           const box = document.createElement("div");
           box.className = "example-box";
           const exampleText = document.createElement("div");
@@ -813,10 +804,10 @@
           section(left, "Example", card.example);
         }
 
-        section(left, "How it works", card.how_it_works);
-        section(right, "Applications", card.applications);
-        section(right, "Related terms", card.related_terms);
-        section(right, "Common mistakes", card.common_mistakes);
+        section(left, "Cách hoạt động", card.how_it_works);
+        section(right, "Ứng dụng", card.applications);
+        section(right, "Thuật ngữ liên quan", card.related_terms);
+        section(right, "Lỗi thường gặp", card.common_mistakes);
         grid.append(left, right);
         details.appendChild(grid);
 
@@ -825,7 +816,7 @@
           const wrap = document.createElement("section");
           wrap.className = "details-section";
           const heading = document.createElement("h4");
-          heading.textContent = "Images";
+          heading.textContent = "Hình ảnh";
           const imageGrid = document.createElement("div");
           imageGrid.className = "image-grid";
           images.forEach((image) => {
@@ -858,7 +849,7 @@
           const wrap = document.createElement("section");
           wrap.className = "details-section";
           const heading = document.createElement("h4");
-          heading.textContent = "References & links";
+          heading.textContent = "Tài liệu tham khảo và liên kết";
           const list = document.createElement("ul");
           list.className = "link-list";
           links.forEach((link) => {
@@ -920,12 +911,9 @@
       async function lookupWord(word) {
         const lookupToken = ++currentLookupToken;
 
-        currentDefinition = null;
         dictionaryPanel.classList.remove("hidden");
         dictionaryContent.replaceChildren();
-        lookupStatus.textContent = `Looking up "${word}"...`;
-        addButton.classList.add("hidden");
-        addButton.disabled = false;
+        lookupStatus.textContent = `Looking up "${word}" online...`;
 
         try {
           const response = await fetch(
@@ -934,40 +922,22 @@
           const data = await response.json();
 
           if (lookupToken !== currentLookupToken) return;
-
           if (!response.ok) {
             throw new Error(data.error || "Word not found.");
           }
 
-          dictionaryContent.replaceChildren();
+          const cardData = data.exists
+            ? data.card
+            : { ...data.definition, deck: "Online result (not saved)" };
 
-          if (data.exists) {
-            const card = data.card;
-            dictionaryContent.append(
-              createElement("h3", card.question || card.name),
-              createDefinitionRow("Definition", card.answer || card.definition),
-              createDefinitionRow("Deck", card.deck || "Existing card"),
-            );
-            lookupStatus.textContent =
-              "This word already exists in your decks.";
-            addButton.classList.add("hidden");
-            return;
-          }
+          const resultCard = createMatchCard(cardData);
+          resultCard.classList.add("expanded");
+          resultCard.setAttribute("aria-expanded", "true");
+          dictionaryContent.replaceChildren(resultCard);
 
-          const definition = data.definition;
-          currentDefinition = definition;
-
-          dictionaryContent.append(
-            createElement("h3", definition.word),
-            createDefinitionRow(
-              "Vietnamese translation",
-              definition.translation,
-            ),
-          );
-
-          lookupStatus.textContent =
-            "Word not found in your decks. You can add it below.";
-          addButton.classList.remove("hidden");
+          lookupStatus.textContent = data.exists
+            ? "This word already exists in your decks."
+            : "Online dictionary result. This word has not been saved to any deck.";
         } catch (error) {
           if (lookupToken !== currentLookupToken) return;
           lookupStatus.textContent = error.message;
@@ -978,83 +948,6 @@
       // HELPERS
       // --------------------------------
 
-      function createElement(tag, text) {
-        const element = document.createElement(tag);
-        element.textContent = text || "Not available";
-        return element;
-      }
-
-      function createDefinitionRow(label, value) {
-        const container = document.createElement("div");
-        container.className = "definition-row";
-
-        const title = document.createElement("strong");
-        title.textContent = label;
-
-        const content = document.createElement("div");
-        content.textContent = value || "Not available";
-
-        container.append(title, content);
-        return container;
-      }
-
-      // --------------------------------
-      // ADD WORD TO SELECTED DECK
-      // --------------------------------
-
-      addButton.addEventListener("click", async () => {
-        const definition = currentDefinition;
-        const lookupToken = currentLookupToken;
-
-        if (!definition) return;
-
-        const deckId = targetDeck.value.trim();
-
-        if (!deckId) {
-          lookupStatus.textContent = "Please select a deck first.";
-          return;
-        }
-
-        addButton.disabled = true;
-        lookupStatus.textContent = `Adding "${definition.word}"...`;
-
-        try {
-          const response = await fetch("/api/add-card", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              deck_id: deckId,
-              word: definition.word,
-            }),
-          });
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.error || "Failed to add card.");
-          }
-
-          if (currentLookupToken !== lookupToken) return;
-
-          lookupStatus.textContent = `Successfully added "${data.word}" to "${data.deck}".`;
-
-          if (currentDefinition === definition) {
-            currentDefinition = null;
-            addButton.classList.add("hidden");
-          }
-        } catch (error) {
-          if (currentLookupToken === lookupToken) {
-            lookupStatus.textContent = error.message;
-          }
-        } finally {
-          if (
-            currentLookupToken === lookupToken &&
-            currentDefinition === definition
-          ) {
-            addButton.disabled = false;
-          }
-        }
-      });
     </script>
   </body>
 </html>
